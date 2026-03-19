@@ -13,7 +13,7 @@ class Corpus(object):
     def __init__(self, dict_dataset):
 
         # define tokenizer
-        self.tokenizer = spacy.load('en_core_web_lg', disable=['tagger', 'parser', 'ner'])
+        self.tokenizer = spacy.blank("en")
         # raw dataset
         self.dict_dataset_raw = dict_dataset
         # tokenized
@@ -75,7 +75,6 @@ dir_results = os.path.join('..', 'data_preprocessed')
 file_results = os.path.join(dir_results, 'results.txt')
 
 datasets = ['dict_author_fandom_doc_train',
-            'dict_author_fandom_doc_cal',
             'dict_author_fandom_doc_val',
             ]
 
@@ -85,7 +84,7 @@ for dataset in datasets:
 
     ######
     # load
-    ######
+    ######6
     with open(os.path.join(dir_results, dataset), 'rb') as f:
         dict_dataset = pickle.load(f)
 
