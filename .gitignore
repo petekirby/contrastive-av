@@ -1,3 +1,7 @@
+# Dataset
+data/*.jsonl
+data_preprocessed/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 simcse/__pycache__/

@@ -33,21 +33,17 @@ class Corpus(object):
         # author/fandom sets for training set (train DML, BFS, UAL)
         self.authors_train = set()
         self.fandoms_train = set()
-        # author/fandom sets for calibration set (train O2D2)
-        self.authors_cal = set()
-        self.fandoms_cal = set()
+ 
         # author/fandom sets for validation set (check results)
         self.authors_val = set()
         self.fandoms_val = set()
 
         # dictionaries for the splits
         self.dict_author_fandom_doc_train = {}
-        self.dict_author_fandom_doc_cal = {}
         self.dict_author_fandom_doc_val = {}
 
         # counts
         self.n_train = 0
-        self.n_cal = 0
         self.n_val = 0
         self.n_dropped = 0
 
@@ -97,32 +93,24 @@ class Corpus(object):
         fandoms = list(self.fandoms)
         fandoms = shuffle(fandoms)
 
-        ##################################################
-        # step 1: split fandoms into three disjoint groups
-        ##################################################
+        ################################################
+        # step 1: split fandoms into two disjoint groups
+        ################################################
         # make fandom list for train set
-        n = int(0.75 * len(fandoms))
+        n = int(0.9 * len(fandoms))
         fandoms_train = fandoms[:n]
-        fandoms = shuffle(fandoms[n:])
-
-        # make fandom list for calibration/validation sets
-        n = int(0.5 * len(fandoms))
-        fandoms_cal = fandoms[:n]
         fandoms_val = fandoms[n:]
 
         ##########################################################
         # step 2: add authors to the groups (includes overlapping)
         ##########################################################
         authors_train = set()
-        authors_cal = set()
         authors_val = set()
 
         for a in self.authors:
             for f in self.dict_author_fandom_doc[a].keys():
                 if f in fandoms_train:
                     authors_train.add(a)
-                if f in fandoms_cal:
-                    authors_cal.add(a)
                 if f in fandoms_val:
                     authors_val.add(a)
 
@@ -131,21 +119,8 @@ class Corpus(object):
         ################################################
         for a in self.authors:
 
-            # make cal/val sets disjoint
-            if a in authors_cal and a in authors_val:
-                if random.uniform(0, 1) < 0.5:
-                    authors_cal.remove(a)
-                else:
-                    authors_val.remove(a)
-
-            # make train/cal and train/cal sets disjoint
+            # make train/val sets disjoint
             if a in authors_train:
-
-                if a in authors_cal:
-                    if random.uniform(0, 1) < 0.5:
-                        authors_cal.remove(a)
-                    else:
-                        authors_train.remove(a)
 
                 if a in authors_val:
                     if random.uniform(0, 1) < 0.5:
@@ -159,21 +134,10 @@ class Corpus(object):
         for a in self.authors:
             for f in self.dict_author_fandom_doc[a]:
 
-                #################
-                # calibration set
-                #################
-                if a in authors_cal and f in fandoms_cal:
-                    if a not in self.dict_author_fandom_doc_cal.keys():
-                        self.dict_author_fandom_doc_cal[a] = {}
-                    self.dict_author_fandom_doc_cal[a][f] = self.dict_author_fandom_doc[a][f]
-                    self.n_cal += len(self.dict_author_fandom_doc_cal[a][f])
-                    self.authors_cal.add(a)
-                    self.fandoms_cal.add(f)
-
                 ################
                 # validation set
                 ################
-                elif a in authors_val and f in fandoms_val:
+                if a in authors_val and f in fandoms_val:
                     if a not in self.dict_author_fandom_doc_val.keys():
                         self.dict_author_fandom_doc_val[a] = {}
                     self.dict_author_fandom_doc_val[a][f] = self.dict_author_fandom_doc[a][f]
@@ -200,10 +164,10 @@ class Corpus(object):
 
 
 ########################################################################
-# original large data set (expected to be in the folder "data_original")
+# original large data set (expected to be in the folder "data")
 ########################################################################
-dir_pairs_PAN = os.path.join('..', 'data_original', 'pairs.jsonl')
-dir_label_PAN = os.path.join('..', 'data_original', 'labels.jsonl')
+dir_pairs_PAN = os.path.join('..', 'data', 'pan20-authorship-verification-training-large.jsonl')
+dir_label_PAN = os.path.join('..', 'data', 'pan20-authorship-verification-training-large-truth.jsonl')
 
 #####################################
 # create folder for preprocessed data
@@ -235,8 +199,6 @@ corpus.split_data()
 ##############################
 with open(os.path.join(dir_results, 'dict_author_fandom_doc_train'), 'wb') as f:
     pickle.dump(corpus.dict_author_fandom_doc_train, f)
-with open(os.path.join(dir_results, 'dict_author_fandom_doc_cal'), 'wb') as f:
-    pickle.dump(corpus.dict_author_fandom_doc_cal, f)
 with open(os.path.join(dir_results, 'dict_author_fandom_doc_val'), 'wb') as f:
     pickle.dump(corpus.dict_author_fandom_doc_val, f)
 
@@ -249,24 +211,16 @@ open(file_results, 'a').write('# unique authors: ' + str(len(corpus.authors)) + 
 open(file_results, 'a').write('# unique fandoms: ' + str(len(corpus.fandoms)) + '\n')
 
 open(file_results, 'a').write('# docs (train): ' + str(corpus.n_train) + '\n')
-open(file_results, 'a').write('# docs (cal): ' + str(corpus.n_cal) + '\n')
 open(file_results, 'a').write('# docs (val): ' + str(corpus.n_val) + '\n')
 open(file_results, 'a').write('# docs (dropped): ' + str(corpus.n_dropped) + '\n')
 
 open(file_results, 'a').write('# authors (train): ' + str(len(corpus.authors_train)) + '\n')
-open(file_results, 'a').write('# authors (cal): ' + str(len(corpus.authors_cal)) + '\n')
 open(file_results, 'a').write('# authors (val): ' + str(len(corpus.authors_val)) + '\n')
 
 open(file_results, 'a').write('# fandoms (train): ' + str(len(corpus.fandoms_train)) + '\n')
-open(file_results, 'a').write('# fandoms (cal): ' + str(len(corpus.fandoms_cal)) + '\n')
 open(file_results, 'a').write('# fandoms (val): ' + str(len(corpus.fandoms_val)) + '\n')
 
-open(file_results, 'a').write('intersection authors (train + cal): ' + str(len(corpus.authors_train.intersection(corpus.authors_cal))) + '\n')
 open(file_results, 'a').write('intersection authors (train + val): ' + str(len(corpus.authors_train.intersection(corpus.authors_val))) + '\n')
-open(file_results, 'a').write('intersection authors (cal + val): ' + str(len(corpus.authors_cal.intersection(corpus.authors_val))) + '\n')
-
-open(file_results, 'a').write('intersection fandoms (train + cal): ' + str(len(corpus.fandoms_train.intersection(corpus.fandoms_cal))) + '\n')
 open(file_results, 'a').write('intersection fandoms (train + val): ' + str(len(corpus.fandoms_train.intersection(corpus.fandoms_val))) + '\n')
-open(file_results, 'a').write('intersection fandoms (cal + val): ' + str(len(corpus.fandoms_cal.intersection(corpus.fandoms_val))) + '\n')
 
 open(file_results, 'a').write('finished!' + '\n')
