@@ -1,14 +1,10 @@
 import logging
-import os
-import sys
 from dataclasses import dataclass
-import torch
 
 import transformers
 from transformers import (
     AutoConfig,
     AutoTokenizer,
-    HfArgumentParser,
     RobertaForCL,
     BertForCL,
 )
@@ -16,14 +12,6 @@ from transformers import (
 logger = logging.getLogger(__name__)
 
 def main():
-    # See all possible arguments  by passing the --help flag to this script.
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, OurTrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        # Only one argument and it's a json file, parse it to get arguments.
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
-    else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
     logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s", datefmt="%m/%d/%Y %H:%M:%S", level=logging.INFO)
 
     # Load pretrained model and tokenizer
@@ -73,14 +61,6 @@ def main():
         raise NotImplementedError
 
     model.resize_token_embeddings(len(tokenizer))
-
-    # Training
-    if training_args.do_train:
-        # train ...
-
-    # Evaluation
-    if training_args.do_eval:
-        # evaluate ...
 
 if __name__ == "__main__":
     main()
