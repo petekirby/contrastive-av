@@ -14,17 +14,23 @@ class TransformerEmbeddingModel(nn.Module):
         model_revision: str = "main",
         use_fast_tokenizer: bool = True,
         use_auth_token: bool = False,
-        pooling: str = "cls",
+        pooling: str = "mean",
+        head_type: str = "none",
         projection_dim: int | None = None,
+        projection_hidden_dim: int | None = None,
         normalize: bool = True,
         resize_token_embeddings: bool = False,
     ):
         super().__init__()
 
-        if pooling not in {"cls", "mean"}:
+        if pooling not in {"cls", "mean", "bert_pooler"}:
             raise ValueError(f"pooling: {pooling}")
 
+        if head_type not in {"none", "simcse", "simclr", "diffcse"}:
+            raise ValueError(f"head_type: {head_type}")
+
         self.pooling = pooling
+        self.head_type = head_type
         self.normalize = normalize
 
         pretrained_kwargs = {"cache_dir": cache_dir, "revision": model_revision, "use_auth_token": use_auth_token}
@@ -47,12 +53,48 @@ class TransformerEmbeddingModel(nn.Module):
         if resize_token_embeddings:
             self.encoder.resize_token_embeddings(len(self.tokenizer))
 
-        if projection_dim is None:
-            self.projection = nn.Identity()
-        else:
-            self.projection = nn.Linear(self.config.hidden_size, projection_dim)
+        hidden_size = self.config.hidden_size
+        output_dim = projection_dim or hidden_size
+        hidden_dim = projection_hidden_dim or hidden_size
 
-        self.embedding_dim = projection_dim or self.config.hidden_size
+        # Source: https://arxiv.org/abs/1908.10084 (Sentence-BERT)
+        if head_type == "none":
+            self.projection = nn.Identity()
+
+        # Source: https://arxiv.org/abs/2104.08821 (SimCSE)
+        elif self.pooling == "bert_pooler":
+            if head_type != "simcse":
+                raise ValueError("bert_pooler requires simcse")
+            if not hasattr(self.encoder, "pooler") or self.encoder.pooler is None:
+                raise ValueError("bert_pooler found no pooler")
+            self.projection = self.encoder.pooler
+
+        # Source: https://arxiv.org/abs/2104.08821 (SimCSE with new projection head of configurable size)
+        elif head_type == "simcse":
+            self.projection = nn.Sequential(
+                nn.Linear(hidden_size, output_dim),
+                nn.Tanh(),
+            )
+
+        # Source: https://arxiv.org/abs/2002.05709 (SimCLR)
+        # Source: https://aclanthology.org/2021.icon-main.33.pdf (Contrastive Learning of Sentence Representations)
+        elif head_type == "simclr":
+            self.projection = nn.Sequential(
+                nn.Linear(hidden_size, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, output_dim),
+            )
+
+        # Source: https://arxiv.org/abs/2204.10298 (DiffCSE)
+        elif head_type == "diffcse":
+            self.projection = nn.Sequential(
+                nn.Linear(hidden_size, hidden_dim),
+                nn.BatchNorm1d(hidden_dim),
+                nn.Tanh(),
+                nn.Linear(hidden_dim, output_dim),
+            )
+
+        self.embedding_dim = output_dim
 
     @staticmethod
     # Source: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2#usage-huggingface-transformers
@@ -62,6 +104,8 @@ class TransformerEmbeddingModel(nn.Module):
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
     def pool(self, last_hidden_state: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
+        if self.pooling == "bert_pooler":
+            return last_hidden_state
         if self.pooling == "cls":
             return last_hidden_state[:, 0]
         if attention_mask is None:
