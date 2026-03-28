@@ -26,7 +26,7 @@ class TransformerEmbeddingModel(nn.Module):
         if pooling not in {"cls", "mean", "bert_pooler"}:
             raise ValueError(f"pooling: {pooling}")
 
-        if head_type not in {"none", "simcse", "simclr", "diffcse"}:
+        if head_type not in {"none", "simcse", "simclr", "diffcse", "simclr_bn"}:
             raise ValueError(f"head_type: {head_type}")
 
         self.pooling = pooling
@@ -91,6 +91,15 @@ class TransformerEmbeddingModel(nn.Module):
                 nn.Linear(hidden_size, hidden_dim),
                 nn.BatchNorm1d(hidden_dim),
                 nn.Tanh(),
+                nn.Linear(hidden_dim, output_dim),
+            )
+
+        # try combining the ReLU of simclr with BatchNorm?
+        elif head_type == "simclr_bn":
+            self.projection = nn.Sequential(
+                nn.Linear(hidden_size, hidden_dim),
+                nn.BatchNorm1d(hidden_dim),
+                nn.ReLU(),
                 nn.Linear(hidden_dim, output_dim),
             )
 
