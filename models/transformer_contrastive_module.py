@@ -1,6 +1,7 @@
 import lightning.pytorch as pl
 import torch
 from optimizer_utils import build_param_groups
+from loss_defaults import build_loss_fn
 from pytorch_metric_learning.losses import BaseMetricLossFunction
 from transformer_embedding_model import TransformerEmbeddingModel
 
@@ -10,20 +11,19 @@ class TransformerContrastiveModule(pl.LightningModule):
     def __init__(
         self,
         model_config: dict,
-        loss_class: type[BaseMetricLossFunction],
-        loss_config: dict,
+        loss_dict: dict,
         lr: float = 2e-5,
         head_lr_multiplier: float = 5.0,
         weight_decay: float = 0.01,
     ):
         super().__init__()
         self.model = TransformerEmbeddingModel(**model_config)
-        self.loss_fn = loss_class(**loss_config)
+        self.loss_fn, loss_dict = build_loss_fn(loss_dict)
+
         self.save_hyperparameters(
             {
                 "model_config": model_config,
-                "loss_class_name": loss_class.__name__,
-                "loss_config": loss_config,
+                "loss_dict": loss_dict,
                 "lr": lr,
                 "head_lr_multiplier": head_lr_multiplier,
                 "weight_decay": weight_decay,
