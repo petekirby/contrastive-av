@@ -26,7 +26,7 @@ class TransformerEmbeddingModel(nn.Module):
         if pooling not in {"cls", "mean", "bert_pooler"}:
             raise ValueError(f"pooling: {pooling}")
 
-        if head_type not in {"none", "simcse", "simclr", "diffcse", "simclr_bn"}:
+        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol"}:
             raise ValueError(f"head_type: {head_type}")
 
         self.pooling = pooling
@@ -55,7 +55,7 @@ class TransformerEmbeddingModel(nn.Module):
 
         hidden_size = self.config.hidden_size
         output_dim = projection_dim or hidden_size
-        hidden_dim = projection_hidden_dim or hidden_size
+        hidden_dim = projection_hidden_dim or (hidden_size if head_type != "diffcse" else hidden_size * 2)
 
         # Source: https://arxiv.org/abs/1908.10084 (Sentence-BERT)
         if head_type == "none":
@@ -67,9 +67,11 @@ class TransformerEmbeddingModel(nn.Module):
                 raise ValueError("bert_pooler requires simcse")
             if not hasattr(self.encoder, "pooler") or self.encoder.pooler is None:
                 raise ValueError("bert_pooler found no pooler")
+            output_dim = hidden_size # has to be hidden_size
             self.projection = self.encoder.pooler
 
-        # Source: https://arxiv.org/abs/2104.08821 (SimCSE with new projection head of configurable size)
+        # Source: https://arxiv.org/abs/2104.08821 (SimCSE with new BERT-style projection head)
+        # Source: https://github.com/princeton-nlp/SimCSE/blob/main/simcse/models.py
         elif head_type == "simcse":
             self.projection = nn.Sequential(
                 nn.Linear(hidden_size, output_dim),
@@ -77,30 +79,35 @@ class TransformerEmbeddingModel(nn.Module):
             )
 
         # Source: https://arxiv.org/abs/2002.05709 (SimCLR)
-        # Source: https://aclanthology.org/2021.icon-main.33.pdf (Contrastive Learning of Sentence Representations)
+        # Source: https://github.com/google-research/simclr/blob/master/model_util.py
         elif head_type == "simclr":
             self.projection = nn.Sequential(
-                nn.Linear(hidden_size, hidden_dim),
-                nn.ReLU(),
-                nn.Linear(hidden_dim, output_dim),
+                nn.Linear(hidden_size, hidden_dim, bias=True),
+                nn.BatchNorm1d(hidden_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(hidden_dim, output_dim, bias=False),
+                nn.BatchNorm1d(output_dim),
             )
 
         # Source: https://arxiv.org/abs/2204.10298 (DiffCSE)
+        # Source: https://github.com/voidism/DiffCSE/blob/master/diffcse/models.py
         elif head_type == "diffcse":
             self.projection = nn.Sequential(
-                nn.Linear(hidden_size, hidden_dim),
+                nn.Linear(hidden_size, hidden_dim, bias=False),
                 nn.BatchNorm1d(hidden_dim),
-                nn.Tanh(),
-                nn.Linear(hidden_dim, output_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(hidden_dim, output_dim, bias=False),
+                nn.BatchNorm1d(output_dim, affine=False),
             )
 
-        # try combining the ReLU of simclr with BatchNorm?
-        elif head_type == "simclr_bn":
+        # Source: https://arxiv.org/pdf/2006.07733 (BYOL: "Contrary to SimCLR, the output of this MLP is not batch normalized")
+        # Source: https://github.com/google-deepmind/deepmind-research/blob/master/byol/utils/networks.py
+        elif head_type == "byol":
             self.projection = nn.Sequential(
-                nn.Linear(hidden_size, hidden_dim),
+                nn.Linear(hidden_size, hidden_dim, bias=True),
                 nn.BatchNorm1d(hidden_dim),
-                nn.ReLU(),
-                nn.Linear(hidden_dim, output_dim),
+                nn.ReLU(inplace=True),
+                nn.Linear(hidden_dim, output_dim, bias=False),
             )
 
         self.embedding_dim = output_dim
@@ -128,11 +135,7 @@ class TransformerEmbeddingModel(nn.Module):
         token_type_ids: torch.Tensor | None = None,
         **kwargs,
     ) -> torch.Tensor:
-        encoder_kwargs = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            **kwargs,
-        }
+        encoder_kwargs = {"input_ids": input_ids, "attention_mask": attention_mask, **kwargs}
         if token_type_ids is not None:
             encoder_kwargs["token_type_ids"] = token_type_ids
 
