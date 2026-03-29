@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from pytorch_metric_learning import distances, losses
+from pytorch_metric_learning import distances, losses, miners
 
 
 def merge_dicts(result, override):
@@ -30,6 +30,7 @@ LOSS_CONFIGS = {
     },
     "contrastive": {
         "loss_class": losses.ContrastiveLoss,
+        "miner": miners.BatchEasyHardMiner,
         "loss_config": {
             "pos_margin": 1.0,
             "neg_margin": 0.5,
@@ -88,4 +89,5 @@ def build_loss_fn(loss_dict):
     loss_kwargs = deepcopy(config["loss_config"])
     if "distance" in loss_kwargs:
         loss_kwargs["distance"] = DISTANCE_CONFIGS[loss_kwargs["distance"]]()
-    return loss_class(**loss_kwargs), config
+    miner = defaults["miner"](distance=loss_kwargs["distance"]) if "miner" in defaults else None
+    return loss_class(**loss_kwargs), miner, config

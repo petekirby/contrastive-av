@@ -1,8 +1,7 @@
 import lightning.pytorch as pl
 import torch
-from optimizer_utils import build_param_groups
 from loss_defaults import build_loss_fn
-from pytorch_metric_learning.losses import BaseMetricLossFunction
+from optimizer_utils import build_param_groups
 from transformer_embedding_model import TransformerEmbeddingModel
 
 
@@ -18,7 +17,7 @@ class TransformerContrastiveModule(pl.LightningModule):
     ):
         super().__init__()
         self.model = TransformerEmbeddingModel(**model_config)
-        self.loss_fn, loss_dict = build_loss_fn(loss_dict)
+        self.loss_fn, self.miner, loss_dict = build_loss_fn(loss_dict)
 
         self.save_hyperparameters(
             {
@@ -34,11 +33,18 @@ class TransformerContrastiveModule(pl.LightningModule):
     # usage: inputs = tokenizer(...), outputs = model(**inputs)
     def forward(self, **inputs) -> torch.Tensor:
         return self.model(**inputs)
+    
+    def loss(self, embeddings, target):
+        if self.miner:
+            mined = self.miner(embeddings, target)
+            return self.loss_fn(embeddings, target, mined)
+        else:
+            return self.loss_fn(embeddings, target)
 
     def training_step(self, batch, batch_idx):
         inputs, target = batch
         embeddings = self(**inputs)
-        loss = self.loss_fn(embeddings, target)
+        loss = self.loss(embeddings, target)
         self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, batch_size=target.shape[0])
         return loss
 
@@ -49,6 +55,6 @@ class TransformerContrastiveModule(pl.LightningModule):
             head_lr_multiplier=self.hparams.head_lr_multiplier,
             weight_decay=self.hparams.weight_decay,
             loss_fn=self.loss_fn,
-            loss_optim_config=self.hparams.loss_optim_config,
+            loss_optim_config=self.hparams.loss_dict["loss_optim_config"],
         )
         return torch.optim.AdamW(param_groups)
