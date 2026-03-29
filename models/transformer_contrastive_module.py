@@ -1,5 +1,6 @@
 import lightning.pytorch as pl
 import torch
+from optimizer_utils import build_param_groups
 from pytorch_metric_learning.losses import BaseMetricLossFunction
 from transformer_embedding_model import TransformerEmbeddingModel
 
@@ -12,7 +13,7 @@ class TransformerContrastiveModule(pl.LightningModule):
         loss_class: type[BaseMetricLossFunction],
         loss_config: dict,
         lr: float = 2e-5,
-        projection_lr_multiplier: float = 5.0,
+        head_lr_multiplier: float = 5.0,
         weight_decay: float = 0.01,
     ):
         super().__init__()
@@ -24,7 +25,7 @@ class TransformerContrastiveModule(pl.LightningModule):
                 "loss_class_name": loss_class.__name__,
                 "loss_config": loss_config,
                 "lr": lr,
-                "projection_lr_multiplier": projection_lr_multiplier,
+                "head_lr_multiplier": head_lr_multiplier,
                 "weight_decay": weight_decay,
             }
         )
@@ -41,17 +42,12 @@ class TransformerContrastiveModule(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(
-            [
-                {
-                    "params": self.model.encoder.parameters(),
-                    "lr": self.hparams.lr,
-                    "weight_decay": self.hparams.weight_decay,
-                },
-                {
-                    "params": self.model.projection.parameters(),
-                    "lr": self.hparams.lr * self.hparams.projection_lr_multiplier,
-                    "weight_decay": self.hparams.weight_decay,
-                },
-            ]
+        param_groups = build_param_groups(
+            model=self.model,
+            base_lr=self.hparams.lr,
+            head_lr_multiplier=self.hparams.head_lr_multiplier,
+            weight_decay=self.hparams.weight_decay,
+            loss_fn=self.loss_fn,
+            loss_optim_config=self.hparams.loss_optim_config,
         )
+        return torch.optim.AdamW(param_groups)
