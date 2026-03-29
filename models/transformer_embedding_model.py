@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from transformers import AutoConfig, AutoModel, AutoTokenizer
+from torch_utils import Residual
 
 
 class TransformerEmbeddingModel(nn.Module):
@@ -26,7 +27,7 @@ class TransformerEmbeddingModel(nn.Module):
         if pooling not in {"cls", "mean", "bert_pooler"}:
             raise ValueError(f"pooling: {pooling}")
 
-        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol"}:
+        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "peri_ln"}:
             raise ValueError(f"head_type: {head_type}")
 
         self.pooling = pooling
@@ -109,6 +110,19 @@ class TransformerEmbeddingModel(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Linear(hidden_dim, output_dim, bias=False),
             )
+
+        # Inspired by: https://arxiv.org/html/2502.02732v1 (Peri-LN)
+        # Inspired by: https://shchegrikovich.substack.com/p/where-to-put-normalization-layer
+        # layer norm before+after MLP, residual not normalized
+        elif head_type == "peri_ln":
+            output_dim = hidden_size # has to be hidden_size
+            self.projection = Residual(nn.Sequential(
+                nn.LayerNorm(hidden_size),
+                nn.Linear(hidden_size, hidden_dim, bias=True),
+                nn.GELU(),
+                nn.Linear(hidden_dim, output_dim, bias=False),
+                nn.LayerNorm(output_dim)
+            ))
 
         self.embedding_dim = output_dim
 
