@@ -112,13 +112,12 @@ class TransformerEmbeddingModel(nn.Module):
             )
 
         # Inspired by: https://arxiv.org/html/2502.02732v1 (Peri-LN)
-        # Inspired by: https://shchegrikovich.substack.com/p/where-to-put-normalization-layer
-        # layer norm before+after MLP, residual not normalized
+        # switch to layer-norm and GELU in the MLP, plus a residual
         elif head_type == "peri_ln":
             output_dim = hidden_size # has to be hidden_size
             self.projection = Residual(nn.Sequential(
-                nn.LayerNorm(hidden_size),
                 nn.Linear(hidden_size, hidden_dim, bias=True),
+                nn.LayerNorm(hidden_dim),
                 nn.GELU(),
                 nn.Linear(hidden_dim, output_dim, bias=False),
                 nn.LayerNorm(output_dim)
