@@ -16,6 +16,7 @@ class TransformerEmbeddingModel(nn.Module):
         use_fast_tokenizer: bool = True,
         use_auth_token: bool = False,
         pooling: str = "mean",
+        concat_layers: int = 4,
         head_type: str = "none",
         projection_dim: int | None = None,
         projection_hidden_dim: int | None = None,
@@ -24,7 +25,7 @@ class TransformerEmbeddingModel(nn.Module):
     ):
         super().__init__()
 
-        if pooling not in {"cls", "mean", "bert_pooler"}:
+        if pooling not in {"cls", "mean", "bert_pooler", "cls_concat"}:
             raise ValueError(f"pooling: {pooling}")
 
         if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "peri_ln"}:
@@ -45,6 +46,14 @@ class TransformerEmbeddingModel(nn.Module):
             use_fast=use_fast_tokenizer,
             **pretrained_kwargs,
         )
+
+        pooled_size = self.config.hidden_size
+        if self.pooling == "cls_concat":
+            pooled_size *= concat_layers
+            self.concat_layers = concat_layers
+            self.cls_layer_norm = nn.LayerNorm(pooled_size)
+            self.config.output_hidden_states = True
+
         self.encoder = AutoModel.from_pretrained(
             model_name_or_path,
             config=self.config,
@@ -54,36 +63,35 @@ class TransformerEmbeddingModel(nn.Module):
         if resize_token_embeddings:
             self.encoder.resize_token_embeddings(len(self.tokenizer))
 
-        hidden_size = self.config.hidden_size
-        output_dim = projection_dim or hidden_size
-        hidden_dim = projection_hidden_dim or (hidden_size if head_type != "diffcse" else hidden_size * 2)
-
-        # Source: https://arxiv.org/abs/1908.10084 (Sentence-BERT)
-        if head_type == "none":
-            self.projection = nn.Identity()
+        output_dim = projection_dim or pooled_size
+        hidden_dim = projection_hidden_dim or (pooled_size if head_type != "diffcse" else pooled_size * 2)
 
         # Source: https://arxiv.org/abs/2104.08821 (SimCSE)
-        elif self.pooling == "bert_pooler":
+        if self.pooling == "bert_pooler":
             if head_type != "simcse":
                 raise ValueError("bert_pooler requires simcse")
             if not hasattr(self.encoder, "pooler") or self.encoder.pooler is None:
                 raise ValueError("bert_pooler found no pooler")
-            output_dim = hidden_size # has to be hidden_size
+            output_dim = pooled_size # has to be same size
             self.projection = self.encoder.pooler
 
         # Source: https://arxiv.org/abs/2104.08821 (SimCSE with new BERT-style projection head)
         # Source: https://github.com/princeton-nlp/SimCSE/blob/main/simcse/models.py
         elif head_type == "simcse":
             self.projection = nn.Sequential(
-                nn.Linear(hidden_size, output_dim),
+                nn.Linear(pooled_size, output_dim),
                 nn.Tanh(),
             )
+
+        # Source: https://arxiv.org/abs/1908.10084 (becomes Sentence-BERT with "mean" pooling)
+        elif head_type == "none":
+            self.projection = nn.Identity()
 
         # Source: https://arxiv.org/abs/2002.05709 (SimCLR)
         # Source: https://github.com/google-research/simclr/blob/master/model_util.py
         elif head_type == "simclr":
             self.projection = nn.Sequential(
-                nn.Linear(hidden_size, hidden_dim, bias=True),
+                nn.Linear(pooled_size, hidden_dim, bias=True),
                 nn.BatchNorm1d(hidden_dim),
                 nn.ReLU(inplace=True),
                 nn.Linear(hidden_dim, output_dim, bias=False),
@@ -94,7 +102,7 @@ class TransformerEmbeddingModel(nn.Module):
         # Source: https://github.com/voidism/DiffCSE/blob/master/diffcse/models.py
         elif head_type == "diffcse":
             self.projection = nn.Sequential(
-                nn.Linear(hidden_size, hidden_dim, bias=False),
+                nn.Linear(pooled_size, hidden_dim, bias=False),
                 nn.BatchNorm1d(hidden_dim),
                 nn.ReLU(inplace=True),
                 nn.Linear(hidden_dim, output_dim, bias=False),
@@ -105,7 +113,7 @@ class TransformerEmbeddingModel(nn.Module):
         # Source: https://github.com/google-deepmind/deepmind-research/blob/master/byol/utils/networks.py
         elif head_type == "byol":
             self.projection = nn.Sequential(
-                nn.Linear(hidden_size, hidden_dim, bias=True),
+                nn.Linear(pooled_size, hidden_dim, bias=True),
                 nn.BatchNorm1d(hidden_dim),
                 nn.ReLU(inplace=True),
                 nn.Linear(hidden_dim, output_dim, bias=False),
@@ -114,9 +122,9 @@ class TransformerEmbeddingModel(nn.Module):
         # Inspired by: https://arxiv.org/html/2502.02732v1 (Peri-LN)
         # switch to layer-norm and GELU in the MLP, plus a residual
         elif head_type == "peri_ln":
-            output_dim = hidden_size # has to be hidden_size
+            output_dim = pooled_size # has to be same size
             self.projection = Residual(nn.Sequential(
-                nn.Linear(hidden_size, hidden_dim, bias=True),
+                nn.Linear(pooled_size, hidden_dim, bias=True),
                 nn.LayerNorm(hidden_dim),
                 nn.GELU(),
                 nn.Linear(hidden_dim, output_dim, bias=False),
@@ -132,11 +140,18 @@ class TransformerEmbeddingModel(nn.Module):
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
-    def pool(self, last_hidden_state: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
+    def cls_concat_pooling(self, hidden_states):
+        concat_cls = torch.stack([layer[:, 0, :] for layer in hidden_states[-self.concat_layers:]], dim=1)
+        return self.cls_layer_norm(concat_cls.reshape(concat_cls.shape[0], -1))
+
+    def pool(self, outputs, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
+        last_hidden_state: torch.Tensor = outputs.last_hidden_state
         if self.pooling == "bert_pooler":
             return last_hidden_state
         if self.pooling == "cls":
             return last_hidden_state[:, 0]
+        if self.pooling == "cls_concat":
+            return self.cls_concat_pooling(outputs.hidden_states)
         if attention_mask is None:
             raise ValueError("attention_mask")
         return self.mean_pooling(last_hidden_state, attention_mask)
@@ -153,5 +168,5 @@ class TransformerEmbeddingModel(nn.Module):
             encoder_kwargs["token_type_ids"] = token_type_ids
 
         outputs = self.encoder(**encoder_kwargs)
-        embeddings = self.projection(self.pool(outputs.last_hidden_state, attention_mask))
+        embeddings = self.projection(self.pool(outputs, attention_mask))
         return F.normalize(embeddings, p=2, dim=-1) if self.normalize else embeddings
