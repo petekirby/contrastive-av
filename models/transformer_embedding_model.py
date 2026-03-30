@@ -28,7 +28,7 @@ class TransformerEmbeddingModel(nn.Module):
         if pooling not in {"cls", "mean", "bert_pooler", "cls_concat"}:
             raise ValueError(f"pooling: {pooling}")
 
-        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "peri_ln"}:
+        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "ln_gelu_residual"}:
             raise ValueError(f"head_type: {head_type}")
 
         self.pooling = pooling
@@ -119,16 +119,14 @@ class TransformerEmbeddingModel(nn.Module):
                 nn.Linear(hidden_dim, output_dim, bias=False),
             )
 
-        # Inspired by: https://arxiv.org/html/2502.02732v1 (Peri-LN)
         # switch to layer-norm and GELU in the MLP, plus a residual
-        elif head_type == "peri_ln":
+        elif head_type == "ln_gelu_residual":
             output_dim = pooled_size # has to be same size
             self.projection = Residual(nn.Sequential(
                 nn.Linear(pooled_size, hidden_dim, bias=True),
                 nn.LayerNorm(hidden_dim),
                 nn.GELU(),
                 nn.Linear(hidden_dim, output_dim, bias=False),
-                nn.LayerNorm(output_dim)
             ))
 
         self.embedding_dim = output_dim
