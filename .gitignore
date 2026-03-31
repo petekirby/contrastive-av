@@ -1,5 +1,5 @@
 # Dataset
-data/*.jsonl
+data_original/
 data_preprocessed/
 
 # Byte-compiled / optimized / DLL files
@@ -134,7 +134,7 @@ dmypy.json
 .pyre/
 .DS_Store
 .vscode
-data
+.data
 result
 .venv-cu11
 wandb
