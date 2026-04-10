@@ -67,7 +67,7 @@ class PANDataModule(L.LightningDataModule):
         )
         pan20_test_loader = DataLoader(
             self.pan20_test_pairs,
-            batch_size=self.eval_batch_size,
+            batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=self.pair_collate_fn,
