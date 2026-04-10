@@ -2,7 +2,7 @@ import torch
 from transformers import AutoTokenizer
 
 
-def contrastive_train_collate_fn(model_name):
+def contrastive_collate_fn(model_name):
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
     def collate_fn(batch):
