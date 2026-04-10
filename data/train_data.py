@@ -1,17 +1,17 @@
 import lightning as L
-import torch
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from pytorch_metric_learning.samplers import MPerClassSampler
 
 
 class TrainDataModule(L.LightningDataModule):
-    def __init__(self, batch_size=32, num_workers=0, sampler="random", m=2):
+    def __init__(self, collate_fn, batch_size=64, sampler="random", m=2, num_workers=0):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.sampler = sampler
         self.m = m
+        self.collate_fn = collate_fn
 
     def setup(self, stage=None):
         self.train_data = load_dataset(
@@ -34,10 +34,7 @@ class TrainDataModule(L.LightningDataModule):
                 sampler=sampler,
                 num_workers=self.num_workers,
                 drop_last=True,
-                collate_fn=lambda b: (
-                    torch.tensor([x["author_int"] for x in b]),
-                    [x["text"] for x in b],
-                ),
+                collate_fn=self.collate_fn,
             )
 
         return DataLoader(
@@ -46,8 +43,5 @@ class TrainDataModule(L.LightningDataModule):
             shuffle=True,
             num_workers=self.num_workers,
             drop_last=True,
-            collate_fn=lambda b: (
-                torch.tensor([x["author_int"] for x in b]),
-                [x["text"] for x in b],
-            ),
+            collate_fn=self.collate_fn,
         )
