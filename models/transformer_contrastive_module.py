@@ -1,9 +1,9 @@
 import lightning.pytorch as pl
 import torch
-from loss_defaults import build_loss_fn
-from optimizer_utils import build_param_groups
-from transformer_embedding_model import TransformerEmbeddingModel
-from contrastive_eval import contrastive_evaluate
+from .loss_defaults import build_loss_fn
+from .optimizer_utils import build_param_groups
+from .transformer_embedding_model import TransformerEmbeddingModel
+from helper_functions.contrastive_eval import contrastive_evaluate
 
 
 # Source: https://lightning.ai/docs/pytorch/stable/common/lightning_module.html

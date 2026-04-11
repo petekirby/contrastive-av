@@ -1,6 +1,7 @@
 # Dataset
 data_original/
 data_preprocessed/
+output/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

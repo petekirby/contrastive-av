@@ -2,7 +2,7 @@ import torch
 from transformers import AutoTokenizer
 
 
-def contrastive_collate_fn(model_name):
+def contrastive_collate_fn(model_name, max_length):
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
     def collate_fn(batch):
@@ -11,7 +11,7 @@ def contrastive_collate_fn(model_name):
                 [x["text"] for x in batch],
                 padding=True,
                 truncation=True,
-                max_length=tokenizer.model_max_length,
+                max_length=max_length,
                 return_tensors="pt",
             ),
             torch.tensor([x["author_int"] for x in batch], dtype=torch.long),
@@ -20,7 +20,7 @@ def contrastive_collate_fn(model_name):
     return collate_fn
 
 
-def contrastive_pair_collate_fn(model_name):
+def contrastive_pair_collate_fn(model_name, max_length):
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
     def collate_fn(batch):
@@ -30,14 +30,14 @@ def contrastive_pair_collate_fn(model_name):
                 [x["text1"] for x in batch],
                 padding=True,
                 truncation=True,
-                max_length=tokenizer.model_max_length,
+                max_length=max_length,
                 return_tensors="pt",
             ),
             "enc2": tokenizer(
                 [x["text2"] for x in batch],
                 padding=True,
                 truncation=True,
-                max_length=tokenizer.model_max_length,
+                max_length=max_length,
                 return_tensors="pt",
             ),
         }

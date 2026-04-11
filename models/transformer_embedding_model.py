@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from transformers import AutoConfig, AutoModel, AutoTokenizer
-from torch_utils import Residual
+from .torch_utils import Residual
 
 
 class TransformerEmbeddingModel(nn.Module):
@@ -14,7 +14,6 @@ class TransformerEmbeddingModel(nn.Module):
         cache_dir: str | None = None,
         model_revision: str = "main",
         use_fast_tokenizer: bool = True,
-        use_auth_token: bool = False,
         pooling: str = "mean",
         concat_layers: int = 4,
         head_type: str = "none",
@@ -35,7 +34,7 @@ class TransformerEmbeddingModel(nn.Module):
         self.head_type = head_type
         self.normalize = normalize
 
-        pretrained_kwargs = {"cache_dir": cache_dir, "revision": model_revision, "use_auth_token": use_auth_token}
+        pretrained_kwargs = {"cache_dir": cache_dir, "revision": model_revision}
 
         self.config = AutoConfig.from_pretrained(
             config_name or model_name_or_path,
