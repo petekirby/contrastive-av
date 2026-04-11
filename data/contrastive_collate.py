@@ -2,44 +2,44 @@ import torch
 from transformers import AutoTokenizer
 
 
-def contrastive_collate_fn(model_name, max_length):
-    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+class ContrastiveCollator:
+    def __init__(self, model_name, max_length):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+        self.max_length = max_length
 
-    def collate_fn(batch):
+    def __call__(self, batch):
         return (
-            tokenizer(
+            self.tokenizer(
                 [x["text"] for x in batch],
                 padding=True,
                 truncation=True,
-                max_length=max_length,
+                max_length=self.max_length,
                 return_tensors="pt",
             ),
             torch.tensor([x["author_int"] for x in batch], dtype=torch.long),
         )
 
-    return collate_fn
 
+class ContrastivePairCollator:
+    def __init__(self, model_name, max_length):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+        self.max_length = max_length
 
-def contrastive_pair_collate_fn(model_name, max_length):
-    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-
-    def collate_fn(batch):
+    def __call__(self, batch):
         return {
             "same": torch.tensor([int(x["same"]) for x in batch], dtype=torch.long),
-            "enc1": tokenizer(
+            "enc1": self.tokenizer(
                 [x["text1"] for x in batch],
                 padding=True,
                 truncation=True,
-                max_length=max_length,
+                max_length=self.max_length,
                 return_tensors="pt",
             ),
-            "enc2": tokenizer(
+            "enc2": self.tokenizer(
                 [x["text2"] for x in batch],
                 padding=True,
                 truncation=True,
-                max_length=max_length,
+                max_length=self.max_length,
                 return_tensors="pt",
             ),
         }
-
-    return collate_fn

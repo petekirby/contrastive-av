@@ -2,12 +2,12 @@ import lightning as L
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from pytorch_metric_learning.samplers import MPerClassSampler
-from .contrastive_collate import contrastive_collate_fn, contrastive_pair_collate_fn
+from .contrastive_collate import ContrastiveCollator, ContrastivePairCollator
 from models.transformer_contrastive_module import TransformerContrastiveModule
 
 
 class PANDataModule(L.LightningDataModule):
-    def __init__(self, batch_size=64, sampler="random", m=2, num_workers=0, max_length=512):
+    def __init__(self, batch_size=128, sampler="mperclass", m=2, num_workers=8, max_length=512):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -30,8 +30,8 @@ class PANDataModule(L.LightningDataModule):
         model_name = model.hparams.model_config["model_name_or_path"]
         self.max_length = min(self.max_length, model.model.config.max_position_embeddings)
         if isinstance(model, TransformerContrastiveModule):
-            self.collate_fn = contrastive_collate_fn(model_name, self.max_length)
-            self.pair_collate_fn = contrastive_pair_collate_fn(model_name, self.max_length)
+            self.collate_fn = ContrastiveCollator(model_name, self.max_length)
+            self.pair_collate_fn = ContrastivePairCollator(model_name, self.max_length)
         else:
             raise ValueError(f"model unrecognized: {type(model).__name__}")
 
@@ -48,6 +48,7 @@ class PANDataModule(L.LightningDataModule):
                 batch_size=self.batch_size,
                 sampler=sampler,
                 num_workers=self.num_workers,
+                persistent_workers=self.num_workers > 0,
                 drop_last=True,
                 collate_fn=self.collate_fn,
             )
@@ -57,6 +58,7 @@ class PANDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
+            persistent_workers=self.num_workers > 0,
             drop_last=True,
             collate_fn=self.collate_fn,
         )
@@ -67,6 +69,7 @@ class PANDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
+            persistent_workers=self.num_workers > 0,
             collate_fn=self.pair_collate_fn,
         )
 
@@ -76,6 +79,7 @@ class PANDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
+            persistent_workers=self.num_workers > 0,
             collate_fn=self.pair_collate_fn,
         )
         pan20_test_loader = DataLoader(
@@ -83,6 +87,7 @@ class PANDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
+            persistent_workers=self.num_workers > 0,
             collate_fn=self.pair_collate_fn,
         )
         return [pan21_test_loader, pan20_test_loader]
