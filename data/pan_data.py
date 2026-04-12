@@ -10,13 +10,14 @@ from models.transformer_contrastive_module import TransformerContrastiveModule
 
 
 class PANDataModule(L.LightningDataModule):
-    def __init__(self, batch_size=128, sampler="mperclass", m=2, num_workers=8, max_length=512):
+    def __init__(self, batch_size=64, sampler="mperclass", m=2, num_workers=8, max_length=512, text_prefix=""):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.sampler = sampler
         self.m = m
         self.max_length = max_length
+        self.text_prefix = text_prefix
         self.collate_fn = None
         self.pair_collate_fn = None
 
@@ -33,8 +34,8 @@ class PANDataModule(L.LightningDataModule):
         model_name = model.hparams.model_config["model_name_or_path"]
         self.max_length = min(self.max_length, model.model.config.max_position_embeddings)
         if isinstance(model, TransformerContrastiveModule):
-            self.collate_fn = ContrastiveCollator(model_name, self.max_length)
-            self.pair_collate_fn = ContrastivePairCollator(model_name, self.max_length)
+            self.collate_fn = ContrastiveCollator(model_name, self.max_length, prefix=self.text_prefix)
+            self.pair_collate_fn = ContrastivePairCollator(model_name, self.max_length, prefix=self.text_prefix)
         else:
             raise ValueError(f"model unrecognized: {type(model).__name__}")
 
@@ -52,6 +53,7 @@ class PANDataModule(L.LightningDataModule):
                 sampler=sampler,
                 num_workers=self.num_workers,
                 persistent_workers=self.num_workers > 0,
+                pin_memory=True,
                 drop_last=True,
                 collate_fn=self.collate_fn,
             )
@@ -62,6 +64,7 @@ class PANDataModule(L.LightningDataModule):
             shuffle=True,
             num_workers=self.num_workers,
             persistent_workers=self.num_workers > 0,
+            pin_memory=True,
             drop_last=True,
             collate_fn=self.collate_fn,
         )

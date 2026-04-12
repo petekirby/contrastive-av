@@ -1,0 +1,29 @@
+seed_everything: 42
+
+trainer:
+  max_epochs: 10
+  accelerator: auto
+  devices: 1
+  precision: bf16-mixed
+  log_every_n_steps: 100
+
+model:
+  class_path: models.transformer_contrastive_module.TransformerContrastiveModule
+  init_args:
+    model_config:
+      model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
+      attn_implementation: flash_attention_2
+      pooling: mean
+      head_type: none
+      normalize: true
+      resize_token_embeddings: false
+
+    loss_dict:
+      name: ntxent
+
+data:
+  batch_size: 256
+  sampler: mperclass
+  m: 2
+  num_workers: 12
+  max_length: 512

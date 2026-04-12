@@ -24,6 +24,7 @@ class TransformerEmbeddingModel(nn.Module):
         projection_hidden_dim: int | None = None,
         normalize: bool = True,
         resize_token_embeddings: bool = False,
+        attn_implementation: str | None = None,
     ):
         super().__init__()
 
@@ -59,6 +60,7 @@ class TransformerEmbeddingModel(nn.Module):
         self.encoder = AutoModel.from_pretrained(
             model_name_or_path,
             config=self.config,
+            attn_implementation=attn_implementation,
             **pretrained_kwargs,
         )
 

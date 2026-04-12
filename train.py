@@ -3,6 +3,7 @@ from lightning.pytorch.cli import LightningCLI
 from lightning.pytorch import LightningModule
 from data.pan_data import PANDataModule
 import warnings
+import torch
 
 
 class TrainCLI(LightningCLI):
@@ -25,4 +26,5 @@ def main():
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=FutureWarning)
+    torch.set_float32_matmul_precision("high")
     main()

@@ -4,6 +4,7 @@
 
 import lightning.pytorch as pl
 import torch
+from transformers import get_scheduler
 from .loss_defaults import build_loss_fn
 from .optimizer_utils import build_param_groups
 from .transformer_embedding_model import TransformerEmbeddingModel
@@ -20,6 +21,8 @@ class TransformerContrastiveModule(pl.LightningModule):
         lr: float = 2e-5,
         head_lr_multiplier: float = 5.0,
         weight_decay: float = 0.01,
+        lr_schedule: str = "linear",
+        warmup_ratio: float = 0.1,
     ):
         super().__init__()
         self.model = TransformerEmbeddingModel(**model_config)
@@ -37,6 +40,8 @@ class TransformerContrastiveModule(pl.LightningModule):
                 "lr": lr,
                 "head_lr_multiplier": head_lr_multiplier,
                 "weight_decay": weight_decay,
+                "lr_schedule": lr_schedule,
+                "warmup_ratio": warmup_ratio,
             }
         )
 
@@ -68,7 +73,22 @@ class TransformerContrastiveModule(pl.LightningModule):
             loss_fn=self.loss_fn,
             loss_optim_config=self.hparams.loss_dict["loss_optim_config"],
         )
-        return torch.optim.AdamW(param_groups)
+        optimizer = torch.optim.AdamW(param_groups)
+        total_steps = self.trainer.estimated_stepping_batches
+        scheduler = get_scheduler(
+            name=self.hparams.lr_schedule,
+            optimizer=optimizer,
+            num_warmup_steps=int(total_steps * self.hparams.warmup_ratio),
+            num_training_steps=total_steps,
+        )
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1,
+            },
+        }
 
     def on_validation_epoch_start(self):
         self._val_scores = []
