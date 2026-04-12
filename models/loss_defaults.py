@@ -1,3 +1,5 @@
+# Only contrastive objectives need these loss functions.
+
 from copy import deepcopy
 
 from pytorch_metric_learning import distances, losses, miners

@@ -1,3 +1,5 @@
+# It's not clear that classification will need much similar eval code, so classification_eval.py may not be necessary.
+
 import torch
 import torch.nn.functional as F
 import numpy as np

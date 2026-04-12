@@ -1,3 +1,5 @@
+# This is currently unused but it's how PAN21 officially scored solutions.
+
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 

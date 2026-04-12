@@ -1,3 +1,6 @@
+# PANDataModule should be used by all models.
+# Any adaptations/preprocessing needed for your model should be put in the collators.
+
 import lightning as L
 from datasets import load_dataset
 from torch.utils.data import DataLoader

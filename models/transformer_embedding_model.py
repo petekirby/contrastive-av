@@ -1,3 +1,6 @@
+# This is an "embedding model" but you could just reuse it and put a linear classification head on it to make a classification model.
+# If so, the module file is a fine place to extend the model that way.
+
 import torch
 import torch.nn.functional as F
 from torch import nn

@@ -1,3 +1,7 @@
+# Significantly different model objectives/approaches will require their own modules on this pattern.
+# The name of the module is one of the key YAML config items / command line arguments, used to select the model..
+# Minor architecture swaps (e.g. different pretrained transformers) do not require separate modules.
+
 import lightning.pytorch as pl
 import torch
 from .loss_defaults import build_loss_fn

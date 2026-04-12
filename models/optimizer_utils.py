@@ -1,3 +1,5 @@
+# This code is used to set whether transformer model parameters receive weight decay or LR multipliers or not.
+
 def split_weight_decay_params(named_parameters, lr, weight_decay, apply_weight_decay=True):
     decay_params, no_decay_params = [], []
     for name, param in named_parameters:
