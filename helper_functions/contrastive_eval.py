@@ -7,8 +7,8 @@ from sklearn.metrics import accuracy_score, f1_score, precision_recall_curve
 
 
 def pair_scores_and_targets(model, batch):
-    emb1 = model(**batch["enc1"])
-    emb2 = model(**batch["enc2"])
+    emb1 = model(**batch["enc1"]).clone()
+    emb2 = model(**batch["enc2"]).clone()
     scores = F.cosine_similarity(emb1, emb2)
     targets = batch["same"]
     return scores.detach().cpu(), targets.detach().cpu()

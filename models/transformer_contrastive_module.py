@@ -23,10 +23,13 @@ class TransformerContrastiveModule(pl.LightningModule):
         weight_decay: float = 0.01,
         lr_schedule: str = "linear",
         warmup_ratio: float = 0.1,
+        compile: bool = False,
     ):
         super().__init__()
         self.model = TransformerEmbeddingModel(**model_config)
-        self.loss_fn, self.miner, loss_dict = build_loss_fn(loss_dict)
+        self.loss_fn, self.miner, loss_dict = build_loss_fn(loss_dict, embedding_size=self.model.embedding_dim)
+        if compile:
+            self.model = torch.compile(self.model, mode="reduce-overhead", fullgraph=False)
         self.register_buffer("eval_threshold", torch.tensor(float("nan")))
         self.test_acc = BinaryAccuracy()
         self.test_f1 = BinaryF1Score()
@@ -61,7 +64,7 @@ class TransformerContrastiveModule(pl.LightningModule):
         inputs, target = batch
         embeddings = self(**inputs)
         loss = self.loss(embeddings, target)
-        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, batch_size=target.shape[0])
+        self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True, batch_size=target.shape[0])
         return loss
 
     def configure_optimizers(self):

@@ -5,16 +5,19 @@ trainer:
   accelerator: auto
   devices: 1
   precision: bf16-mixed
-  log_every_n_steps: 100
 
 model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
+    compile: false
+    lr: 2e-5
     model_config:
       model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       attn_implementation: flash_attention_2
-      pooling: mean
-      head_type: none
+      pooling: cls_concat
+      concat_layers: 4
+      head_type: ln_gelu_residual
+      projection_hidden_dim: 2496
       normalize: true
       resize_token_embeddings: false
 
