@@ -1,10 +1,10 @@
-# Responsibility: Eric
+# Responsibility: Henry
 
 # This file needs to be filled out to get pairs for classification from the training data.
-# ClassificationCollator should be implemented, kind of like ContrastiveCollator in contrastive_collate.py
-# ClassificationPairCollator can also be implemented but should be very similar to the pair collator in contrastive_collate.py
+# BaselineCollator should be implemented, kind of like ContrastiveCollator in contrastive_collate.py
+# BaselinePairCollator can also be implemented but should be very similar to the pair collator in contrastive_collate.py
 # because the pairs are already constructed for the pair collator.
-# ClassificationCollator will need to produce pairs.
+# BaselineCollator will need to produce pairs (if the baseline implementation requires pairs).
 # You should assume the batch is already processed somehow, like with MPerClass, to have at least 1 positive (same author) for each 'anchor' (text/doc).
 
 # Recommendation:
