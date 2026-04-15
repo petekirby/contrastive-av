@@ -27,7 +27,7 @@ class TransformerContrastiveModule(pl.LightningModule):
     ):
         super().__init__()
         self.model = TransformerEmbeddingModel(**model_config)
-        self.loss_fn, self.miner, loss_dict = build_loss_fn(loss_dict, embedding_size=self.model.embedding_dim)
+        self.loss_fn, self.miner, loss_dict = build_loss_fn(loss_dict)
         if compile:
             self.model = torch.compile(self.model, mode="reduce-overhead", fullgraph=False)
         self.register_buffer("eval_threshold", torch.tensor(float("nan")))

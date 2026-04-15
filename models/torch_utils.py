@@ -66,10 +66,12 @@ class ChunkedTrainStep(nn.Module):
         # Detach, then use for backprop: https://docs.pytorch.org/docs/stable/generated/torch.Tensor.requires_grad_.html
         embeddings = torch.cat(cached, dim=0).detach().requires_grad_()
         indices_tuple = self.miner(embeddings, target) if self.miner is not None else None
+        # Because of requires_grad_() above, PyTorch keeps track of operations in loss_fn that use embeddings.
         loss = self.loss_fn(embeddings, target, indices_tuple)
+        # This allows PyTorch to compute the gradient of the loss (L) with respect to the embeddings (Z).
         # Docs: https://docs.pytorch.org/docs/stable/generated/torch.autograd.grad.html
         # Intuition: https://medium.com/@rizqinur2010/partial-derivatives-chain-rule-using-torch-autograd-grad-a8b5917373fa
-        grad_cache = torch.autograd.grad(loss, embeddings)[0] # returns a 1-tuple (dL/dZ,)
+        grad_cache = torch.autograd.grad(loss, embeddings)[0] # grad returns a 1-tuple (dL/dZ,)
 
         opt = pl_module.optimizers()
         opt.zero_grad()
