@@ -74,6 +74,7 @@ class ChunkedTrainStep(nn.Module):
         grad_cache = torch.autograd.grad(loss, embeddings)[0] # grad returns a 1-tuple (dL/dZ,)
 
         opt = pl_module.optimizers()
+        scheduler = pl_module.lr_schedulers()
         opt.zero_grad()
 
         for x, state, g in zip(chunks, states, grad_cache.split(self.microbatch_size)):
@@ -83,4 +84,5 @@ class ChunkedTrainStep(nn.Module):
                 pl_module.manual_backward(per_chunk_backprop_loss)
 
         opt.step()
+        scheduler.step()
         return loss.detach()

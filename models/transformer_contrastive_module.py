@@ -5,6 +5,7 @@
 import lightning.pytorch as pl
 import torch
 from transformers import get_scheduler
+from .torch_utils import ChunkedTrainStep
 from .loss_defaults import build_loss_fn
 from .optimizer_utils import build_param_groups
 from .transformer_embedding_model import TransformerEmbeddingModel
@@ -24,12 +25,17 @@ class TransformerContrastiveModule(pl.LightningModule):
         lr_schedule: str = "linear",
         warmup_ratio: float = 0.1,
         compile: bool = False,
+        microbatch_size: int | None = None,
     ):
         super().__init__()
         self.model = TransformerEmbeddingModel(**model_config)
         self.loss_fn, self.miner, loss_dict = build_loss_fn(loss_dict)
         if compile:
             self.model = torch.compile(self.model, mode="reduce-overhead", fullgraph=False)
+        self.microbatch_size = microbatch_size
+        if self.microbatch_size is not None:
+            self.chunked_train_step = ChunkedTrainStep(self.loss_fn, self.microbatch_size, self.miner)
+            self.automatic_optimization = False
         self.register_buffer("eval_threshold", torch.tensor(float("nan")))
         self.test_acc = BinaryAccuracy()
         self.test_f1 = BinaryF1Score()
@@ -45,6 +51,7 @@ class TransformerContrastiveModule(pl.LightningModule):
                 "weight_decay": weight_decay,
                 "lr_schedule": lr_schedule,
                 "warmup_ratio": warmup_ratio,
+                "microbatch_size": microbatch_size,
             }
         )
 
@@ -62,8 +69,11 @@ class TransformerContrastiveModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         inputs, target = batch
-        embeddings = self(**inputs)
-        loss = self.loss(embeddings, target)
+        if self.microbatch_size is not None:
+            loss = self.chunked_train_step(self, inputs, target)
+        else:
+            embeddings = self(**inputs)
+            loss = self.loss(embeddings, target)
         self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True, batch_size=target.shape[0])
         return loss
 
