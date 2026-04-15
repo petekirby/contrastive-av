@@ -13,7 +13,7 @@ from helper_functions.contrastive_eval import pair_scores_and_targets, contrasti
 from torchmetrics.classification import BinaryAccuracy, BinaryF1Score
 
 
-# Source: https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
+# Docs: https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
 class TransformerContrastiveModule(pl.LightningModule):
     def __init__(
         self,

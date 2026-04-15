@@ -10,8 +10,8 @@ model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
     compile: false
-    lr: 2e-5
-    microbatch_size: 32
+    lr: 8e-5
+    microbatch_size: 256
     model_config:
       model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       attn_implementation: flash_attention_2
@@ -26,7 +26,7 @@ model:
       name: ntxent
 
 data:
-  batch_size: 256
+  batch_size: 1024
   sampler: mperclass
   m: 2
   num_workers: 12
