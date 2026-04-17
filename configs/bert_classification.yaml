@@ -1,0 +1,30 @@
+seed_everything: 42                                                                                                                        
+                                                                                                                                            
+trainer:                                                                                                                                   
+  max_epochs: 10
+  accelerator: auto
+  devices: 1                                                                                                                               
+  precision: bf16-mixed
+                                                                                                                                            
+model:                                                                                                                                   
+  class_path: models.transformer_classification_module.TransformerClassificationModule
+  init_args:                                                                                                                               
+    compile: false
+    lr: 2e-5                                                                                                                               
+    head_lr_multiplier: 5.0                                                                                                              
+    weight_decay: 0.01
+    lr_schedule: linear                                                                                                                    
+    warmup_ratio: 0.1
+    freeze_encoder: false                                                                                                                  
+    model_config:                                                                                                                        
+      model_name_or_path: google-bert/bert-base-uncased
+      pooling: cls                                                                                                                         
+      head_type: none
+      normalize: false                                                                                                                     
+                                                                                                                                          
+data:                                                                                                                                      
+  batch_size: 32                                                                                                                         
+  sampler: mperclass
+  m: 2                                                                                                                                     
+  num_workers: 12
+  max_length: 512                                                                                                                          

@@ -7,6 +7,8 @@ from torch.utils.data import DataLoader
 from pytorch_metric_learning.samplers import MPerClassSampler
 from .contrastive_collate import ContrastiveCollator, ContrastivePairCollator
 from models.transformer_contrastive_module import TransformerContrastiveModule
+from models.transformer_classification_module import TransformerClassificationModule                                                       
+from .classification_collate import ClassificationCollator, ClassificationPairCollator          
 
 
 class PANDataModule(L.LightningDataModule):
@@ -36,6 +38,9 @@ class PANDataModule(L.LightningDataModule):
         if isinstance(model, TransformerContrastiveModule):
             self.collate_fn = ContrastiveCollator(model_name, self.max_length, prefix=self.text_prefix)
             self.pair_collate_fn = ContrastivePairCollator(model_name, self.max_length, prefix=self.text_prefix)
+        elif isinstance(model, TransformerClassificationModule):
+            self.collate_fn = ClassificationCollator(model_name, self.max_length, prefix = self.text_prefix)
+            self.pair_collate_fn = ClassificationPairCollator(model_name, self.max_length, prefix = self.text_prefix)
         else:
             raise ValueError(f"model unrecognized: {type(model).__name__}")
 
