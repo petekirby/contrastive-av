@@ -67,27 +67,28 @@ class ClassificationCollator:
         # inputs dict, labels tensor
         return enc, torch.tensor(pair_labels, dtype=torch.long)
     
-# Collates pre-constructed pairs for val/test, tokenizes and returns labels 
+# Collates pre-constructed pairs for val/test, tokenizes and returns labels. 
 class ClassificationPairCollator:
     def __init__(self, model_name, max_length, prefix = ""):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast = True)
         self.max_length = max_length
         self.prefix = prefix
-    
-    def __call__(self, batch):
-        texts_a = [self.prefix + x["text1"] if self.prefix else x["text1"] for x in batch]
-        texts_b = [self.prefix + x["text2"] if self.prefix else x["text2"] for x in batch]
-
-        enc = self.tokenizer(
-            texts_a,
-            texts_b,
-            add_special_tokens = True,
-            truncation = "longest_first",
-            max_length = self.max_length,
-            padding = "max_length",
-            return_tensors = "pt",
+        
+    # Pre-truncates texts to avoid slow tokenization for long docs.
+    def __call__(self, batch):                                                                                                                                                                        
+        texts_a = [(self.prefix + x["text1"] if self.prefix else x["text1"])[:3000] for x in batch]                                        
+        texts_b = [(self.prefix + x["text2"] if self.prefix else x["text2"])[:3000] for x in batch]                                        
+                                            
+        enc = self.tokenizer(                                                                                                              
+            texts_a,                    
+            texts_b,                                                                                                                       
+            add_special_tokens = True,                                                                                                     
+            truncation = "longest_first",                                                                                                  
+            max_length = self.max_length,                                                                                                  
+            padding = "max_length",         
+            return_tensors = "pt",      
         )
-
+                                                                                                                                            
         labels = torch.tensor([int(x["same"]) for x in batch], dtype = torch.long)
-        # inputs dict, labels tensor 
-        return enc, labels   
+        # inputs dict, labels tensor                                                                                                       
+        return enc, labels                  
