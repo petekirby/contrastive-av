@@ -4,12 +4,14 @@ import torch
 from transformers import AutoTokenizer
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 
-# Returns a string only because ClassificationCollator needs to pass two strings to the tokenizer togetther
-def random_text_start(text): 
-    s = " " + text
-    i = torch.randint(len(s), (1,)).item()
-    start = s.rfind(" ", 0, i) + 1
-    return (s[start:] + s[:start - 1]).strip()
+# Returns a string starting from a random word boundary, pre-truncated to avoid                                                            
+# tokenizing unnecessarily long text                                                           
+def random_text_start(text, max_chars=3000):                                                                                               
+    s = " " + text                                                                                                                         
+    i = torch.randint(len(s), (1,)).item()                                                                                                 
+    start = s.rfind(" ", 0, i) + 1                                                                                                         
+    sample = (s[start:] + s[:start - 1]).strip()                                                                                           
+    return sample[:max_chars]                   
 
 # Collects individual documents into (text_A, text_B) pairs for classification based training via triplet mining, forming pairs, and tokenization
 class ClassificationCollator:
