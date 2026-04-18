@@ -17,28 +17,37 @@ def split_weight_decay_params(named_parameters, lr, weight_decay, apply_weight_d
         groups.append({"params": no_decay_params, "lr": lr, "weight_decay": 0.0})
     return groups
 
+def unique_named_parameters(named_parameters, seen):
+    for name, param in named_parameters:
+        if id(param) in seen:
+            continue
+        seen.add(id(param))
+        yield name, param
 
 def build_param_groups(model, base_lr, head_lr_multiplier, weight_decay, loss_fn, loss_optim_config=None):
     param_groups = []
-    param_groups.extend(
-        split_weight_decay_params(
-            model.encoder.named_parameters(),
-            lr=base_lr,
-            weight_decay=weight_decay,
-        )
-    )
+    seen = set()
 
     projection_lr = base_lr * head_lr_multiplier
     param_groups.extend(
         split_weight_decay_params(
-            model.projection.named_parameters(),
+            unique_named_parameters(model.projection.named_parameters(), seen),
             lr=projection_lr,
             weight_decay=weight_decay,
         )
     )
 
+    # shared projection/pooler params are skipped
+    param_groups.extend(
+        split_weight_decay_params(
+            unique_named_parameters(model.encoder.named_parameters(), seen),
+            lr=base_lr,
+            weight_decay=weight_decay,
+        )
+    )
+
     loss_optim_config = loss_optim_config or {}
-    loss_params = list(loss_fn.named_parameters())
+    loss_params = list(unique_named_parameters(loss_fn.named_parameters(), seen))
     if loss_params:
         loss_lr = base_lr * loss_optim_config.get("lr_multiplier", 1.0)
         param_groups.extend(

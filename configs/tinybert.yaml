@@ -1,7 +1,7 @@
 seed_everything: 42
 
 trainer:
-  max_epochs: 10
+  max_epochs: 40
   accelerator: auto
   devices: 1
   precision: bf16-mixed
@@ -10,24 +10,26 @@ model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
     compile: false
-    lr: 8e-5
+    lr: 4e-5
+    lr_schedule: linear
+    warmup_ratio: 0.1
     microbatch_size: 256
     model_config:
       model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       attn_implementation: flash_attention_2
-      pooling: cls_concat
-      concat_layers: 4
-      head_type: ln_gelu_residual
-      projection_hidden_dim: 2496
+      pooling: mean
+      head_type: none
       normalize: true
       resize_token_embeddings: false
 
     loss_dict:
-      name: ntxent
+      name: supcon
 
 data:
   batch_size: 1024
+  eval_batch_size: 256
   sampler: mperclass
   m: 2
-  num_workers: 12
+  num_threads: 12
   max_length: 512
+  tokenizer_parallelism: true

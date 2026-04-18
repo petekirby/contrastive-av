@@ -1,7 +1,9 @@
+import os
+import sys
+import time
 import torch
 import torch.nn as nn
 from torch.utils.checkpoint import get_device_states, set_device_states
-
 
 class Residual(nn.Module):
     def __init__(self, fn: nn.Module):
@@ -49,22 +51,20 @@ class ChunkedTrainStep(nn.Module):
         self.microbatch_size = microbatch_size
         self.miner = miner
 
-    def _split(self, inputs): # splits tokenizer dictionary
+    def forward(self, pl_module, inputs, target):
         n = next(iter(inputs.values())).shape[0]
         m = self.microbatch_size
-        return [{k: v[i:i + m] for k, v in inputs.items()} for i in range(0, n, m)]
 
-    def forward(self, pl_module, inputs, target):
-        chunks = self._split(inputs)
-
-        states, cached = [], []
-        for x in chunks:
+        states, embeddings_list = [], []
+        for i in range(0, n, m):
+            x = {k: v[i:i + m] for k, v in inputs.items()}
             states.append(RandContext(*x.values()))
-            with torch.no_grad():
-                cached.append(pl_module(**x))
+            with torch.inference_mode():
+                embeddings_list.append(pl_module(**x))
 
         # Detach, then use for backprop: https://docs.pytorch.org/docs/stable/generated/torch.Tensor.requires_grad_.html
-        embeddings = torch.cat(cached, dim=0).detach().requires_grad_()
+        embeddings = torch.cat(embeddings_list, dim=0).detach().requires_grad_()
+        del embeddings_list
         indices_tuple = self.miner(embeddings, target) if self.miner is not None else None
         # Because of requires_grad_() above, PyTorch keeps track of operations in loss_fn that use embeddings.
         loss = self.loss_fn(embeddings, target, indices_tuple)
@@ -72,12 +72,15 @@ class ChunkedTrainStep(nn.Module):
         # Docs: https://docs.pytorch.org/docs/stable/generated/torch.autograd.grad.html
         # Intuition: https://medium.com/@rizqinur2010/partial-derivatives-chain-rule-using-torch-autograd-grad-a8b5917373fa
         grad_cache = torch.autograd.grad(loss, embeddings)[0] # grad returns a 1-tuple (dL/dZ,)
+        loss_out = loss.detach()
+        del loss, embeddings, indices_tuple
 
         opt = pl_module.optimizers()
         scheduler = pl_module.lr_schedulers()
-        opt.zero_grad()
+        opt.zero_grad(set_to_none=True)
 
-        for x, state, g in zip(chunks, states, grad_cache.split(self.microbatch_size)):
+        for i, state, g in zip(range(0, n, m), states, grad_cache.split(self.microbatch_size)):
+            x = {k: v[i:i + m] for k, v in inputs.items()}
             with state:
                 z = pl_module(**x)
                 per_chunk_backprop_loss = torch.dot(z.flatten(), g.flatten())
@@ -85,4 +88,4 @@ class ChunkedTrainStep(nn.Module):
 
         opt.step()
         scheduler.step()
-        return loss.detach()
+        return loss_out

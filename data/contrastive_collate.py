@@ -3,71 +3,87 @@ from transformers import AutoTokenizer
 
 
 # For simplicity, wraps around to the beginning if starting near the end.
-def random_token_span(tokenizer, text, total_length, prefix=""):
+def random_span_text(text, prefix="", random=False):
+    if not random:
+        return prefix + text
+
     s = " " + text
     i = torch.randint(len(s), (1,)).item()
     start = s.rfind(" ", 0, i) + 1
-
     sample = s[start:] + s[:start - 1]
+
     if prefix:
         sample = prefix + sample
 
-    return tokenizer(
-        sample,
-        add_special_tokens=True,
-        truncation=True,
-        max_length=total_length,
-        padding="max_length",
-    )
+    return sample
 
 
 class ContrastiveCollator:
-    def __init__(self, model_name, max_length, prefix=""):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+    def __init__(self, model_name, max_length, prefix="", padding_left=False, random_span=True):
+        self._lazy_tokenizer = None
+        self.model_name = model_name
         self.max_length = max_length
         self.prefix = prefix
+        self.padding_left = padding_left
+        self.random_span = random_span
+
+    def tokenizer(self, *args, **kwargs):
+        if self._lazy_tokenizer is None:
+            self._lazy_tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True, padding_side="left" if self.padding_left else "right")
+        return self._lazy_tokenizer(*args, **kwargs)
 
     def __call__(self, batch):
-        enc = [
-            random_token_span(
-                self.tokenizer,
-                x["text"],
-                total_length=self.max_length,
-                prefix=self.prefix,
-            )
-            for x in batch
-        ]
-        enc = {k: torch.tensor([x[k] for x in enc], dtype=torch.long) for k in enc[0]}
-        return enc, torch.tensor([x["author_int"] for x in batch], dtype=torch.long)
+        texts = [random_span_text(x["text"], prefix=self.prefix, random=self.random_span) for x in batch]
+
+        enc = self.tokenizer(
+            texts,
+            add_special_tokens=True,
+            truncation=True,
+            max_length=self.max_length,
+            padding="max_length",
+            return_tensors="pt",
+        )
+
+        return dict(enc), torch.tensor([x["author_int"] for x in batch], dtype=torch.long)
 
 
 class ContrastivePairCollator:
-    def __init__(self, model_name, max_length, prefix=""):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+    def __init__(self, model_name, max_length, prefix="", padding_left=False):
+        self._lazy_tokenizer = None
+        self.model_name = model_name
         self.max_length = max_length
         self.prefix = prefix
+        self.padding_left = padding_left
+
+    def tokenizer(self, *args, **kwargs):
+        if self._lazy_tokenizer is None:
+            self._lazy_tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True, padding_side="left" if self.padding_left else "right")
+        return self._lazy_tokenizer(*args, **kwargs)
 
     def __call__(self, batch):
-        enc1 = [
-            random_token_span(
-                self.tokenizer,
-                x["text1"],
-                total_length=self.max_length,
-                prefix=self.prefix,
-            )
-            for x in batch
-        ]
-        enc2 = [
-            random_token_span(
-                self.tokenizer,
-                x["text2"],
-                total_length=self.max_length,
-                prefix=self.prefix,
-            )
-            for x in batch
-        ]
+        texts1 = [random_span_text(x["text1"], prefix=self.prefix, random=False) for x in batch]
+        texts2 = [random_span_text(x["text2"], prefix=self.prefix, random=False) for x in batch]
+
+        enc1 = self.tokenizer(
+            texts1,
+            add_special_tokens=True,
+            truncation=True,
+            max_length=self.max_length,
+            padding="max_length",
+            return_tensors="pt",
+        )
+
+        enc2 = self.tokenizer(
+            texts2,
+            add_special_tokens=True,
+            truncation=True,
+            max_length=self.max_length,
+            padding="max_length",
+            return_tensors="pt",
+        )
+
         return {
             "same": torch.tensor([int(x["same"]) for x in batch], dtype=torch.long),
-            "enc1": {k: torch.tensor([x[k] for x in enc1], dtype=torch.long) for k in enc1[0]},
-            "enc2": {k: torch.tensor([x[k] for x in enc2], dtype=torch.long) for k in enc2[0]},
+            "enc1": dict(enc1),
+            "enc2": dict(enc2),
         }

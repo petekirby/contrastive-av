@@ -30,6 +30,13 @@ LOSS_CONFIGS = {
         },
         "loss_optim_config": {},
     },
+    "supcon": {
+        "loss_class": losses.SupConLoss,
+        "loss_config": {
+            "temperature": 0.05,
+        },
+        "loss_optim_config": {},
+    },
     "contrastive": {
         "loss_class": losses.ContrastiveLoss,
         "miner": miners.BatchEasyHardMiner,

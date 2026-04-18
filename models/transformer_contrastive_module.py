@@ -4,6 +4,7 @@
 
 import lightning.pytorch as pl
 import torch
+import bitsandbytes as bnb
 from transformers import get_scheduler
 from .torch_utils import ChunkedTrainStep
 from .loss_defaults import build_loss_fn
@@ -22,6 +23,9 @@ class TransformerContrastiveModule(pl.LightningModule):
         lr: float = 2e-5,
         head_lr_multiplier: float = 5.0,
         weight_decay: float = 0.01,
+        beta1: float = 0.9,
+        beta2: float = 0.999,
+        eps: float = 1e-8,
         lr_schedule: str = "linear",
         warmup_ratio: float = 0.1,
         compile: bool = False,
@@ -31,7 +35,10 @@ class TransformerContrastiveModule(pl.LightningModule):
         self.model = TransformerEmbeddingModel(**model_config)
         self.loss_fn, self.miner, loss_dict = build_loss_fn(loss_dict)
         if compile:
-            self.model = torch.compile(self.model, mode="reduce-overhead", fullgraph=False)
+            self.model = torch.compile(self.model, mode="default", fullgraph=False)
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eps = eps
         self.microbatch_size = microbatch_size
         if self.microbatch_size is not None:
             self.chunked_train_step = ChunkedTrainStep(self.loss_fn, self.microbatch_size, self.miner)
@@ -49,8 +56,12 @@ class TransformerContrastiveModule(pl.LightningModule):
                 "lr": lr,
                 "head_lr_multiplier": head_lr_multiplier,
                 "weight_decay": weight_decay,
+                "beta1": beta1,
+                "beta2": beta2,
+                "eps": eps,
                 "lr_schedule": lr_schedule,
                 "warmup_ratio": warmup_ratio,
+                "compile": compile,
                 "microbatch_size": microbatch_size,
             }
         )
@@ -74,7 +85,7 @@ class TransformerContrastiveModule(pl.LightningModule):
         else:
             embeddings = self(**inputs)
             loss = self.loss(embeddings, target)
-        self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True, batch_size=target.shape[0])
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, batch_size=target.shape[0])
         return loss
 
     def configure_optimizers(self):
@@ -86,7 +97,7 @@ class TransformerContrastiveModule(pl.LightningModule):
             loss_fn=self.loss_fn,
             loss_optim_config=self.hparams.loss_dict["loss_optim_config"],
         )
-        optimizer = torch.optim.AdamW(param_groups)
+        optimizer = bnb.optim.PagedAdamW8bit(param_groups, betas=(self.beta1, self.beta2), eps=self.eps) # it's free VRAM
         total_steps = self.trainer.estimated_stepping_batches
         scheduler = get_scheduler(
             name=self.hparams.lr_schedule,
