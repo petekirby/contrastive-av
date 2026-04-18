@@ -13,10 +13,11 @@ class TransformerEmbeddingModel(nn.Module):
         self,
         model_name_or_path: str,
         config_name: str | None = None,
-        tokenizer_name: str | None = None,
         cache_dir: str | None = None,
         model_revision: str = "main",
-        use_fast_tokenizer: bool = True,
+        use_bf16: bool = False,
+        use_liger_kernel: bool = False,
+        gradient_checkpointing: bool = False,
         pooling: str = "mean",
         concat_layers: int = 4,
         head_type: str = "none",
@@ -27,8 +28,9 @@ class TransformerEmbeddingModel(nn.Module):
         attn_implementation: str | None = None,
     ):
         super().__init__()
+        self.apply_liger_kernel(model_name_or_path, use_liger_kernel)
 
-        if pooling not in {"cls", "mean", "bert_pooler", "cls_concat"}:
+        if pooling not in {"cls", "mean", "bert_pooler", "cls_concat", "last"}:
             raise ValueError(f"pooling: {pooling}")
 
         if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "ln_gelu_residual"}:
@@ -44,11 +46,6 @@ class TransformerEmbeddingModel(nn.Module):
             config_name or model_name_or_path,
             **pretrained_kwargs,
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_name or model_name_or_path,
-            use_fast=use_fast_tokenizer,
-            **pretrained_kwargs,
-        )
 
         pooled_size = self.config.hidden_size
         if self.pooling == "cls_concat":
@@ -61,8 +58,15 @@ class TransformerEmbeddingModel(nn.Module):
             model_name_or_path,
             config=self.config,
             attn_implementation=attn_implementation,
+            dtype=torch.bfloat16 if use_bf16 else None,
             **pretrained_kwargs,
         )
+
+        if gradient_checkpointing:
+            self.encoder.gradient_checkpointing_enable()
+
+        if hasattr(self.encoder.config, "use_cache"):
+            self.encoder.config.use_cache = False
 
         if resize_token_embeddings:
             self.encoder.resize_token_embeddings(len(self.tokenizer))
@@ -136,11 +140,36 @@ class TransformerEmbeddingModel(nn.Module):
         self.embedding_dim = output_dim
 
     @staticmethod
+    def apply_liger_kernel(model_name_or_path, use_liger_kernel):
+        if not use_liger_kernel:
+            return
+        name = model_name_or_path.lower()
+        if "harrier-oss-v1-270m" in name or "gemma3" in name:
+            from liger_kernel.transformers import apply_liger_kernel_to_gemma3_text
+            apply_liger_kernel_to_gemma3_text()
+        elif "harrier-oss-v1-0.6b" in name or "qwen3" in name:
+            from liger_kernel.transformers import apply_liger_kernel_to_qwen3
+            apply_liger_kernel_to_qwen3()
+        else:
+            raise ValueError(f"No liger kernel for {model_name_or_path}")
+
+    @staticmethod
     # Source: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2#usage-huggingface-transformers
     # Mean Pooling - Take attention mask into account for correct averaging
     def mean_pooling(token_embeddings, attention_mask):
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
+    @staticmethod
+    # Source: https://huggingface.co/Qwen/Qwen3-Embedding-0.6B#transformers-usage
+    def last_token_pooling(last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+        left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
+        if left_padding:
+            return last_hidden_states[:, -1]
+        else:
+            sequence_lengths = attention_mask.sum(dim=1) - 1
+            batch_size = last_hidden_states.shape[0]
+            return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
 
     def cls_concat_pooling(self, hidden_states):
         concat_cls = torch.stack([layer[:, 0, :] for layer in hidden_states[-self.concat_layers:]], dim=1)
@@ -149,13 +178,15 @@ class TransformerEmbeddingModel(nn.Module):
     def pool(self, outputs, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
         last_hidden_state: torch.Tensor = outputs.last_hidden_state
         if self.pooling == "bert_pooler":
-            return last_hidden_state
+            return last_hidden_state # used by self.encoder.pooler
         if self.pooling == "cls":
             return last_hidden_state[:, 0]
         if self.pooling == "cls_concat":
             return self.cls_concat_pooling(outputs.hidden_states)
         if attention_mask is None:
             raise ValueError("attention_mask")
+        if self.pooling == "last":
+            return self.last_token_pooling(last_hidden_state, attention_mask)
         return self.mean_pooling(last_hidden_state, attention_mask)
 
     def forward(

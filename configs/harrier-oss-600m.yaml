@@ -1,0 +1,43 @@
+seed_everything: 42
+
+trainer:
+  max_epochs: 10
+  accelerator: auto
+  devices: 1
+  precision: bf16-mixed
+
+model:
+  class_path: models.transformer_contrastive_module.TransformerContrastiveModule
+  init_args:
+    compile: true
+    lr: 8e-5 # previously 8e-5
+    weight_decay: 1e-5
+    beta2: 0.98
+    eps: 1e-6
+    lr_schedule: linear
+    warmup_ratio: 0.1
+    microbatch_size: 16
+    model_config:
+      model_name_or_path: microsoft/harrier-oss-v1-0.6b
+      use_bf16: true
+      use_liger_kernel: true
+      gradient_checkpointing: false
+      attn_implementation: flash_attention_2
+      pooling: last
+      head_type: none
+      normalize: true
+      resize_token_embeddings: false
+
+    loss_dict:
+      name: supcon
+
+data:
+  batch_size: 256
+  eval_batch_size: 16
+  sampler: mperclass
+  m: 2
+  num_threads: 12
+  max_length: 512
+  tokenizer_parallelism: true
+  padding_left: true
+  text_prefix: 'Instruct: Retrieve texts with similar authorial style\nQuery: ' #'Instruct: Retrieve stylistically similar text\nQuery: '
