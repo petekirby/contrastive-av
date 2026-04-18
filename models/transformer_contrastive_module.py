@@ -12,6 +12,7 @@ from .optimizer_utils import build_param_groups
 from .transformer_embedding_model import TransformerEmbeddingModel
 from helper_functions.contrastive_eval import pair_scores_and_targets, contrastive_metrics
 from torchmetrics.classification import BinaryAccuracy, BinaryF1Score
+from pytorch_metric_learning import losses
 
 
 # Docs: https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
@@ -30,6 +31,7 @@ class TransformerContrastiveModule(pl.LightningModule):
         warmup_ratio: float = 0.1,
         compile: bool = False,
         microbatch_size: int | None = None,
+        cross_batch_memory_size: int | None = None,
     ):
         super().__init__()
         self.model = TransformerEmbeddingModel(**model_config)
@@ -43,6 +45,10 @@ class TransformerContrastiveModule(pl.LightningModule):
         if self.microbatch_size is not None:
             self.chunked_train_step = ChunkedTrainStep(self.loss_fn, self.microbatch_size, self.miner)
             self.automatic_optimization = False
+        self.cross_batch_memory_size = cross_batch_memory_size
+        if self.cross_batch_memory_size is not None:
+            self.loss_fn = losses.CrossBatchMemory(self.loss_fn, self.model.embedding_dim, memory_size=self.cross_batch_memory_size, miner=self.miner)
+            self.miner = None
         self.register_buffer("eval_threshold", torch.tensor(float("nan")))
         self.test_acc = BinaryAccuracy()
         self.test_f1 = BinaryF1Score()
@@ -63,6 +69,7 @@ class TransformerContrastiveModule(pl.LightningModule):
                 "warmup_ratio": warmup_ratio,
                 "compile": compile,
                 "microbatch_size": microbatch_size,
+                "cross_batch_memory_size": cross_batch_memory_size,
             }
         )
 

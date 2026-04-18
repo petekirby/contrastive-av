@@ -5,15 +5,18 @@ trainer:
   accelerator: auto
   devices: 1
   precision: bf16-mixed
+# trainer:
+#   accumulate_grad_batches: 4 <-- to test gradient accumulation vs Cross-Batch-Memory vs GradCache
 
 model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
-    compile: false
+    compile: true
     lr: 4e-5
     lr_schedule: linear
     warmup_ratio: 0.1
-    microbatch_size: 256
+    microbatch_size: 256 # GradCache
+    # XBM: cross_batch_memory_size: 1024
     model_config:
       model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       attn_implementation: flash_attention_2
@@ -26,7 +29,8 @@ model:
       name: supcon
 
 data:
-  batch_size: 1024
+  batch_size: 1024 # GradCache
+  # XBM/gradient accumulation: batch_size: 256
   eval_batch_size: 256
   sampler: mperclass
   m: 2
