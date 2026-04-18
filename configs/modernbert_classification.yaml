@@ -26,5 +26,5 @@ data:
   batch_size: 16
   sampler: mperclass                                                                                                                       
   m: 2              
-  num_workers: 4
+  num_threads: 4
   max_length: 512
