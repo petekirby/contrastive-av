@@ -7,8 +7,7 @@ trainer:
   precision: bf16-mixed                                             
                                                                     
 model:                                                              
-  class_path: models.transformer_classification_module.TransformerCl
-assificationModule                          
+  class_path: models.transformer_classification_module.TransformerClassificationModule                          
   init_args:                            
     compile: false
     lr: 8e-5                                                        
