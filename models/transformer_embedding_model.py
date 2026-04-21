@@ -24,7 +24,6 @@ class TransformerEmbeddingModel(nn.Module):
         projection_dim: int | None = None,
         projection_hidden_dim: int | None = None,
         normalize: bool = True,
-        resize_token_embeddings: bool = False,
         attn_implementation: str | None = None,
     ):
         super().__init__()
@@ -72,9 +71,6 @@ class TransformerEmbeddingModel(nn.Module):
 
         if hasattr(self.encoder.config, "use_cache"):
             self.encoder.config.use_cache = False
-
-        if resize_token_embeddings:
-            self.encoder.resize_token_embeddings(len(self.tokenizer))
 
         output_dim = projection_dim or pooled_size
         hidden_dim = projection_hidden_dim or pooled_size * 4
@@ -190,8 +186,8 @@ class TransformerEmbeddingModel(nn.Module):
             return last_hidden_states[torch.arange(batch_size, device=last_hidden_states.device), sequence_lengths]
 
     def cls_concat_pooling(self, hidden_states):
-        concat_cls = torch.stack([layer[:, 0, :] for layer in hidden_states[-self.concat_layers:]], dim=1)
-        return self.cls_layer_norm(concat_cls.reshape(concat_cls.shape[0], -1))
+        cls_layers = [layer[:, 0, :] for layer in hidden_states[-self.concat_layers:]]
+        return self.cls_layer_norm(torch.cat(cls_layers, dim=-1))
 
     # Source: https://github.com/princeton-nlp/SimCSE/blob/main/simcse/models.py
     def mean_first_last_pooling(self, hidden_states, attention_mask: torch.Tensor) -> torch.Tensor:
@@ -229,7 +225,8 @@ class TransformerEmbeddingModel(nn.Module):
         encoder_kwargs = {"input_ids": input_ids, "attention_mask": attention_mask, **kwargs}
         if token_type_ids is not None:
             encoder_kwargs["token_type_ids"] = token_type_ids
-
+        if self.pooling in {"cls_concat", "mean_first_last", "mean_first_last_concat"}:
+            encoder_kwargs["output_hidden_states"] = True
         outputs = self.encoder(**encoder_kwargs)
         embeddings = self.projection(self.pool(outputs, attention_mask))
         return F.normalize(embeddings, p=2, dim=-1) if self.normalize else embeddings

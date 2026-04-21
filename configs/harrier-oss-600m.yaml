@@ -26,7 +26,6 @@ model:
       pooling: last
       head_type: none
       normalize: true
-      resize_token_embeddings: false
 
     loss_dict:
       name: supcon

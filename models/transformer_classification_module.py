@@ -172,6 +172,3 @@ class TransformerClassificationModule(pl.LightningModule):
                 "frequency": 1,
             },
         }
-            
-    
-
