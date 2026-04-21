@@ -30,10 +30,10 @@ class TransformerEmbeddingModel(nn.Module):
         super().__init__()
         self.apply_liger_kernel(model_name_or_path, use_liger_kernel)
 
-        if pooling not in {"cls", "mean", "bert_pooler", "cls_concat", "last"}:
+        if pooling not in {"cls", "mean", "max", "mean_first_last", "mean_first_last_concat", "bert_pooler", "cls_concat", "last"}:
             raise ValueError(f"pooling: {pooling}")
 
-        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "ln_gelu_residual"}:
+        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "ln_gelu_residual", "two_linear_layer"}:
             raise ValueError(f"head_type: {head_type}")
 
         self.pooling = pooling
@@ -48,7 +48,12 @@ class TransformerEmbeddingModel(nn.Module):
         )
 
         pooled_size = self.config.hidden_size
-        if self.pooling == "cls_concat":
+        if self.pooling == "mean_first_last_concat":
+            pooled_size *= 2
+            self.config.output_hidden_states = True
+        elif self.pooling == "mean_first_last":
+            self.config.output_hidden_states = True
+        elif self.pooling == "cls_concat":
             pooled_size *= concat_layers
             self.concat_layers = concat_layers
             self.cls_layer_norm = nn.LayerNorm(pooled_size)
@@ -72,7 +77,7 @@ class TransformerEmbeddingModel(nn.Module):
             self.encoder.resize_token_embeddings(len(self.tokenizer))
 
         output_dim = projection_dim or pooled_size
-        hidden_dim = projection_hidden_dim or (pooled_size if head_type != "diffcse" else pooled_size * 2)
+        hidden_dim = projection_hidden_dim or pooled_size * 4
 
         # Source: https://arxiv.org/abs/2104.08821 (SimCSE)
         if self.pooling == "bert_pooler":
@@ -137,6 +142,13 @@ class TransformerEmbeddingModel(nn.Module):
                 nn.Linear(hidden_dim, output_dim, bias=False),
             ))
 
+        # just use two linear layers
+        elif head_type == "two_linear_layer":
+            self.projection = nn.Sequential(
+                nn.Linear(pooled_size, hidden_dim, bias=False),
+                nn.Linear(hidden_dim, output_dim, bias=False),
+            )
+
         self.embedding_dim = output_dim
 
     @staticmethod
@@ -161,6 +173,12 @@ class TransformerEmbeddingModel(nn.Module):
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
     @staticmethod
+    # Source: https://github.com/huggingface/sentence-transformers/blob/main/sentence_transformers/sentence_transformer/modules/pooling.py
+    def max_pooling(token_embeddings, attention_mask):
+        mask = attention_mask.unsqueeze(-1).expand_as(token_embeddings).to(token_embeddings.dtype)
+        return token_embeddings.masked_fill(mask == 0, torch.finfo(token_embeddings.dtype).min).max(dim=1).values
+
+    @staticmethod
     # Source: https://huggingface.co/Qwen/Qwen3-Embedding-0.6B#transformers-usage
     def last_token_pooling(last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
@@ -175,6 +193,14 @@ class TransformerEmbeddingModel(nn.Module):
         concat_cls = torch.stack([layer[:, 0, :] for layer in hidden_states[-self.concat_layers:]], dim=1)
         return self.cls_layer_norm(concat_cls.reshape(concat_cls.shape[0], -1))
 
+    # Source: https://github.com/princeton-nlp/SimCSE/blob/main/simcse/models.py
+    def mean_first_last_pooling(self, hidden_states, attention_mask: torch.Tensor) -> torch.Tensor:
+        first = self.mean_pooling(hidden_states[1], attention_mask)
+        last = self.mean_pooling(hidden_states[-1], attention_mask)
+        if self.pooling == "mean_first_last_concat":
+            return torch.cat([first, last], dim=-1)
+        return (first + last) / 2.0
+
     def pool(self, outputs, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
         last_hidden_state: torch.Tensor = outputs.last_hidden_state
         if self.pooling == "bert_pooler":
@@ -187,6 +213,10 @@ class TransformerEmbeddingModel(nn.Module):
             raise ValueError("attention_mask")
         if self.pooling == "last":
             return self.last_token_pooling(last_hidden_state, attention_mask)
+        if self.pooling == "max":
+            return self.max_pooling(last_hidden_state, attention_mask)
+        if self.pooling == "mean_first_last" or self.pooling == "mean_first_last_concat":
+            return self.mean_first_last_pooling(outputs.hidden_states, attention_mask)
         return self.mean_pooling(last_hidden_state, attention_mask)
 
     def forward(

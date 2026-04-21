@@ -1,7 +1,7 @@
 seed_everything: 42
 
 trainer:
-  max_epochs: 40
+  max_epochs: 40 # was 10
   accelerator: auto
   devices: 1
   precision: bf16-mixed
@@ -12,7 +12,7 @@ model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
     compile: true
-    lr: 4e-5
+    lr: 4e-5 # was 2e-5
     lr_schedule: linear
     warmup_ratio: 0.1
     microbatch_size: 256 # GradCache
@@ -27,13 +27,14 @@ model:
 
     loss_dict:
       name: supcon
+      temperature: 0.05
 
 data:
-  batch_size: 1024 # GradCache
+  batch_size: 1024 # GradCache was 1024
   # XBM/gradient accumulation: batch_size: 256
   eval_batch_size: 256
   sampler: mperclass
-  m: 2
+  m: 4
   num_threads: 12
   max_length: 512
   tokenizer_parallelism: true

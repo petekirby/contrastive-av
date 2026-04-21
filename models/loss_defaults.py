@@ -50,9 +50,27 @@ LOSS_CONFIGS = {
     "multisimilarity": {
         "loss_class": losses.MultiSimilarityLoss,
         "loss_config": {
-            "alpha": 2,
-            "beta": 40,
+            "alpha": 10,
+            "beta": 50,
             "base": 0.5,
+        },
+        "loss_optim_config": {},
+    },
+    "circle": {
+        "loss_class": losses.CircleLoss,
+        "loss_config": {
+            "m": 0.4,
+            "gamma": 80,
+            "distance": "cosine",
+        },
+        "loss_optim_config": {},
+    },
+    "generalized_lifted": {
+        "loss_class": losses.GeneralizedLiftedStructureLoss,
+        "loss_config": {
+            "pos_margin": 0.0,
+            "neg_margin": 1.0,
+            "distance": "l2",
         },
         "loss_optim_config": {},
     },
