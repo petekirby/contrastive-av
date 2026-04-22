@@ -2,6 +2,7 @@
 
 import lightning.pytorch as pl
 import torch
+import bitsandbytes as bnb
 import torch.nn as nn
 from transformers import AutoModelForSequenceClassification, get_scheduler
 from .optimizer_utils import split_weight_decay_params
@@ -45,7 +46,7 @@ class TransformerClassificationModule(pl.LightningModule):
 
         # Also enable speed / efficiency improvements via torch.compile
         if compile:
-            self.model = torch.compile(self.model, mode = "reduce-overhead", fullgraph = False)
+            self.model = torch.compile(self.model, mode = "default", fullgraph = False)
 
         # Threshold for converting logit to prediction, calibrated on validation set                                                                         
         self.register_buffer("eval_threshold", torch.tensor(0.0))
@@ -121,8 +122,8 @@ class TransformerClassificationModule(pl.LightningModule):
         
         # Store sigmoid probabilities / scores and targets for threshold calibration
         scores = torch.sigmoid(logits)
-        self._val_scores.append(scores.detach().cpu())
-        self._val_targets.append(labels.detach().cpu())
+        self._val_scores.append(scores.detach().float().cpu())
+        self._val_targets.append(labels.detach().float().cpu())
 
         # Also log validation loss for monitoring
         loss = self.loss_fn(logits, labels.float())

@@ -1,0 +1,27 @@
+seed_everything: 42
+
+trainer:
+  max_epochs: 10
+  accelerator: auto
+  devices: 1
+  precision: bf16-mixed
+
+model:
+  class_path: models.transformer_classification_module.TransformerClassificationModule
+  init_args:
+    compile: false
+    lr: 2e-5
+    lr_schedule: linear
+    warmup_ratio: 0.1
+    model_config:
+      model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
+      attn_implementation: flash_attention_2
+
+data:
+  batch_size: 256
+  eval_batch_size: 256
+  sampler: mperclass
+  m: 2
+  num_threads: 12
+  max_length: 512
+  tokenizer_parallelism: true
