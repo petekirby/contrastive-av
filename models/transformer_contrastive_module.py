@@ -104,7 +104,7 @@ class TransformerContrastiveModule(pl.LightningModule):
             loss_fn=self.loss_fn,
             loss_optim_config=self.hparams.loss_dict["loss_optim_config"],
         )
-        optimizer = bnb.optim.PagedAdamW8bit(param_groups, betas=(self.beta1, self.beta2), eps=self.eps) # it's free VRAM
+        optimizer = bnb.optim.PagedAdamW32bit(param_groups, betas=(self.beta1, self.beta2), eps=self.eps) # it's free VRAM
         total_steps = self.trainer.estimated_stepping_batches
         scheduler = get_scheduler(
             name=self.hparams.lr_schedule,

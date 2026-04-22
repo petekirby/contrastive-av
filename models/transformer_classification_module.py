@@ -15,6 +15,9 @@ class TransformerClassificationModule(pl.LightningModule):
         lr: float = 2e-5,
         head_lr_multiplier: float = 5.0,
         weight_decay: float = 0.01,
+        beta1: float = 0.9,
+        beta2: float = 0.999,
+        eps: float = 1e-8,
         lr_schedule: str = "linear",
         warmup_ratio: float = 0.1,
         compile: bool = False,
@@ -47,6 +50,11 @@ class TransformerClassificationModule(pl.LightningModule):
         # Threshold for converting logit to prediction, calibrated on validation set                                                                         
         self.register_buffer("eval_threshold", torch.tensor(0.0))
 
+        # Optimizer hyperparameters
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eps = eps
+
         # Metrics, separate instances for val/PAN20/21 test
         self.val_acc = BinaryAccuracy()
         self.val_f1 = BinaryF1Score()
@@ -61,6 +69,9 @@ class TransformerClassificationModule(pl.LightningModule):
             "lr": lr,
             "head_lr_multiplier": head_lr_multiplier,
             "weight_decay": weight_decay,
+            "beta1": beta1,
+            "beta2": beta2,
+            "eps": eps,
             "lr_schedule": lr_schedule,
             "warmup_ratio": warmup_ratio,
             "freeze_encoder": freeze_encoder,
@@ -173,7 +184,7 @@ class TransformerClassificationModule(pl.LightningModule):
         param_groups = [g for g in param_groups if g["params"]]
 
         # AdamW optimizer with linear warmup + decay schedule
-        optimizer = torch.optim.AdamW(param_groups)
+        optimizer = bnb.optim.PagedAdamW32bit(param_groups, betas=(self.beta1, self.beta2), eps=self.eps) # it's free VRAM
         total_steps = self.trainer.estimated_stepping_batches
         scheduler = get_scheduler(
             name = self.hparams.lr_schedule,
