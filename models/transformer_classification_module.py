@@ -1,15 +1,11 @@
 # Responsibility: Eric
 
-# This should be a lightning module built on the pattern of transformer_contrastive_module.py
-# You can use a model or model+head from transformer_embedding_model.py for most of the model part.
-# Then this file could add a linear classification head on top of it (and handle classification instead of contrastive learning objectives).
-
 import lightning.pytorch as pl
 import torch
 import torch.nn as nn
-from transformers import get_scheduler
-from .transformer_embedding_model import TransformerEmbeddingModel
+from transformers import AutoModelForSequenceClassification, get_scheduler
 from .optimizer_utils import split_weight_decay_params
+from helper_functions.contrastive_eval import calibrate_threshold
 from torchmetrics.classification import BinaryAccuracy, BinaryF1Score
 
 class TransformerClassificationModule(pl.LightningModule):
@@ -26,23 +22,30 @@ class TransformerClassificationModule(pl.LightningModule):
     ):
         super().__init__()
 
-        # Reuse the same embedding model as contrastive module (encoder + pooling + projection)
-        self.model = TransformerEmbeddingModel(**model_config)
+        # Use HF's sequence classification model, which preserves model-specific intermediate layers 
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_config["model_name_or_path"],
+            num_labels = 1, # Single logit for binary classification with BCE loss
+            attn_implementation = model_config.get("attn_implementation"),
+            dtype = torch.bfloat16 if model_config.get("use_bf16") else None
+        )
 
-        # Classification head, responsible for mapping embedding to 2 classes (same author / different author)
-        self.classifier = nn.Linear(self.model.embedding_dim, 2)
+        # BCE loss on a single logit 
+        self.loss_fn = nn.BCEWithLogitsLoss()
 
-        # Standard CE loss for classification purposes
-        self.loss_fn = nn.CrossEntropyLoss()
-
-        # Enable transformer encoder freezing (only head trains)
+        # Enable transformer encoder freezing 
         if freeze_encoder:
-            for param in self.model.encoder.parameters():
-                param.requires_grad = False 
+            for name, param in self.model.named_parameters():
+                # Keep classifier head trainable, freeze everything else
+                if "classifier" not in name:
+                    param.requires_grad = False 
 
         # Also enable speed / efficiency improvements via torch.compile
         if compile:
             self.model = torch.compile(self.model, mode = "reduce-overhead", fullgraph = False)
+
+        # Threshold for converting logit to prediction, calibrated on validation set                                                                         
+        self.register_buffer("eval_threshold", torch.tensor(0.0))
 
         # Metrics, separate instances for val/PAN20/21 test
         self.val_acc = BinaryAccuracy()
@@ -63,44 +66,65 @@ class TransformerClassificationModule(pl.LightningModule):
             "freeze_encoder": freeze_encoder,
         })
 
-    # Get pooled embedding from transformer, then classify
+    # Object returned with logits. Given num_labels = 1, squeeze (batch_size, 1) -> (batch_size,)
     def forward(self, **inputs) -> torch.Tensor:
-        embeddings = self.model(**inputs)
-        logits = self.classifier(embeddings)
-        return logits
+        outputs = self.model(**inputs)
+        return outputs.logits.squeeze(-1)
 
     # Unpack tokenized pair dict and binary labels
     def training_step(self, batch, batch_idx): # batch_idx required by Lightning module even if unused
         inputs, labels = batch
         logits = self(**inputs)
-        loss = self.loss_fn(logits, labels)
+        loss = self.loss_fn(logits, labels.float()) # BCE needs float labels
         self.log("train_loss", loss, prog_bar = True, on_step = False, on_epoch = True, batch_size = labels.shape[0])
         return loss    
+    
+    # Collect validation scores for epoch end threshold calibration
+    def on_validation_epoch_start(self):
+        self._val_scores = []
+        self._val_targets = [] 
+
+    # Find optimal threshold via validation predictions, then reset for next epoch
+    def on_validation_epoch_end(self):
+        targets = torch.cat(self._val_targets).numpy()
+        scores = torch.cat(self._val_scores).numpy()
+
+        # Reuse contrastive module's threshold calibration via F1 maximization 
+        threshold = calibrate_threshold(targets, scores)
+        self.eval_threshold.fill_(float(threshold))
+
+        # Compute metrics given calibrated threshold 
+        preds = (torch.cat(self._val_scores) >= threshold).int() 
+        true = torch.cat(self._val_targets).int()
+        self.val_acc.update(preds, true) 
+        self.val_f1.update(preds, true)
+        self.log("val_acc", self.val_acc.compute(), prog_bar = True)
+        self.log("val_f1", self.val_f1.compute(), prog_bar = True)
+        self.val_acc.reset()
+        self.val_f1.reset()
     
     # Compute predictions and accumulate metrics
     def validation_step(self, batch, batch_idx):
         inputs, labels = batch
         logits = self(**inputs)
-        preds = logits.argmax(dim = -1)
-        self.val_acc.update(preds, labels)
-        self.val_f1.update(preds, labels)
+        
+        # Store sigmoid probabilities / scores and targets for threshold calibration
+        scores = torch.sigmoid(logits)
+        self._val_scores.append(scores.detach().cpu())
+        self._val_targets.append(labels.detach().cpu())
 
         # Also log validation loss for monitoring
-        loss = self.loss_fn(logits, labels)
+        loss = self.loss_fn(logits, labels.float())
         self.log("val_loss", loss, prog_bar = False, on_step = False, on_epoch = True, batch_size = labels.shape[0])
-
-    # Compute and log accumulated val metrics, then reset for next epoch
-    def on_validation_epoch_end(self):
-        self.log("val_acc", self.val_acc.compute(), prog_bar=True)
-        self.log("val_f1", self.val_f1.compute(), prog_bar=True)
-        self.val_acc.reset()
-        self.val_f1.reset()
     
     # Two test dataloaders: 0 = PAN21 (primary test set), 1 = PAN20
     def test_step(self, batch, batch_idx, dataloader_idx = 0):
         inputs, labels = batch
         logits = self(**inputs)
-        preds = logits.argmax(dim=-1)
+        scores = torch.sigmoid(logits)
+        threshold = float(self.eval_threshold.item()) 
+        preds = (scores >= threshold).int() 
+        labels = labels.int()
 
         if dataloader_idx == 0:
             # PAN21 test set (open-set: unseen authors and topics)
@@ -120,35 +144,28 @@ class TransformerClassificationModule(pl.LightningModule):
 
     # Build param groups with different learning rates
     # Encoder params: base lr (small as a means of preserving pre-trained knowledge)
-    # Projection + classifier params: lr * multiplier (larger since it's learning from scratch)
+    # Classifier head: higher lr since learning from scratch
     def configure_optimizers(self):
         param_groups = []
 
         # Encoder parameters (will be empty if frozen since requires_grad = False)
+        encoder_parameters = [(n, p) for n, p in self.model.named_parameters() if "classifier" not in n and p.requires_grad]
         param_groups.extend(
             split_weight_decay_params(
-                self.model.encoder.named_parameters(),
+                encoder_parameters,
                 lr = self.hparams.lr,
                 weight_decay = self.hparams.weight_decay,
             )
         )
 
-        # Projection head parameters (from TransformerEmbeddingModel)
+        # Classification head parameters 
         head_lr = self.hparams.lr * self.hparams.head_lr_multiplier
+        head_parameters = [(n, p) for n, p in self.model.named_parameters() if "classifier" in n and p.requires_grad]
         param_groups.extend(
             split_weight_decay_params(
-                self.model.projection.named_parameters(),
+                head_parameters,
                 lr = head_lr,
                 weight_decay = self.hparams.weight_decay,
-            )
-        )
-
-        # Classification head parameters
-        param_groups.extend(
-            split_weight_decay_params(
-                self.classifier.named_parameters(),
-                lr = head_lr,
-                weight_decay=self.hparams.weight_decay,
             )
         )
 
