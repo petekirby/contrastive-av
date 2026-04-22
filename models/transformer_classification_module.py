@@ -88,7 +88,7 @@ class TransformerClassificationModule(pl.LightningModule):
         inputs, labels = batch
         logits = self(**inputs)
         loss = self.loss_fn(logits, labels.float()) # BCE needs float labels
-        self.log("train_loss", loss, prog_bar = True, on_step = False, on_epoch = True, batch_size = labels.shape[0])
+        self.log("train_loss", loss, prog_bar = True, on_step = True, on_epoch = True, batch_size = labels.shape[0])
         return loss    
     
     # Collect validation scores for epoch end threshold calibration

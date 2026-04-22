@@ -13,6 +13,9 @@ def random_text_start(text, max_chars=3000):
     sample = (s[start:] + s[:start - 1]).strip()                                                                                           
     return sample[:max_chars]                   
 
+def has_padding(encoding, max_length):
+    return torch.any(encoding["attention_mask"].sum(dim=1) < max_length).item()
+
 # Collects individual documents into (text_A, text_B) pairs for classification based training via triplet mining, forming pairs, and tokenization
 class ClassificationCollator:
     def __init__(self, model_name, max_length, prefix = ""):
@@ -21,7 +24,9 @@ class ClassificationCollator:
         self.prefix = prefix
 
     # Batch from MPerClassSampler (ensures at least m documents per author), each item consists of 'text' and 'author_int'
-    def __call__(self, batch):
+    def __call__(self, batch, max_chars = None):
+        if max_chars is None:
+            max_chars = (self.max_length // 2) * 5
         texts = [x["text"] for x in batch]
         labels = torch.tensor([x["author_int"] for x in batch], dtype = torch.long)
 
@@ -34,12 +39,12 @@ class ClassificationCollator:
         pair_labels = []
 
         for i in range(len(a)):
-            text_a = random_text_start(texts[a[i]])
+            text_a = random_text_start(texts[a[i]], max_chars)
             if self.prefix:
                 text_a = self.prefix + text_a
 
             # Positive pair
-            text_p = random_text_start(texts[p[i]])
+            text_p = random_text_start(texts[p[i]], max_chars)
             if self.prefix:
                 text_p = self.prefix + text_p
             pair_texts_a.append(text_a)
@@ -47,7 +52,7 @@ class ClassificationCollator:
             pair_labels.append(1)
 
             # Negative pair
-            text_n = random_text_start(texts[n[i]])
+            text_n = random_text_start(texts[n[i]], max_chars)
             if self.prefix:
                 text_n = self.prefix + text_n
             pair_texts_a.append(text_a)
@@ -64,21 +69,26 @@ class ClassificationCollator:
             return_tensors = "pt",
         )
 
+        if max_chars == (self.max_length // 2) * 5 and has_padding(enc, self.max_length):
+            return self.__call__(batch, max_chars = self.max_length * 5) # retry once
+
         # inputs dict, labels tensor
         return enc, torch.tensor(pair_labels, dtype=torch.long)
-    
+
 # Collates pre-constructed pairs for val/test, tokenizes and returns labels. 
 class ClassificationPairCollator:
     def __init__(self, model_name, max_length, prefix = ""):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast = True)
         self.max_length = max_length
         self.prefix = prefix
-        
+
     # Pre-truncates texts to avoid slow tokenization for long docs.
-    def __call__(self, batch):                                                                                                                                                                        
-        texts_a = [(self.prefix + x["text1"] if self.prefix else x["text1"])[:3000] for x in batch]                                        
-        texts_b = [(self.prefix + x["text2"] if self.prefix else x["text2"])[:3000] for x in batch]                                        
-                                            
+    def __call__(self, batch, max_chars = None):                                                                                                                                                                        
+        if max_chars is None:
+            max_chars = (self.max_length // 2) * 5
+        texts_a = [(self.prefix + x["text1"] if self.prefix else x["text1"])[:max_chars] for x in batch]                                        
+        texts_b = [(self.prefix + x["text2"] if self.prefix else x["text2"])[:max_chars] for x in batch]                                        
+
         enc = self.tokenizer(                                                                                                              
             texts_a,                    
             texts_b,                                                                                                                       
@@ -88,7 +98,10 @@ class ClassificationPairCollator:
             padding = "max_length",         
             return_tensors = "pt",      
         )
-                                                                                                                                            
+
+        if max_chars == (self.max_length // 2) * 5 and has_padding(enc, self.max_length):
+            return self.__call__(batch, max_chars = self.max_length * 5) # retry once
+
         labels = torch.tensor([int(x["same"]) for x in batch], dtype = torch.long)
         # inputs dict, labels tensor                                                                                                       
-        return enc, labels                  
+        return enc, labels

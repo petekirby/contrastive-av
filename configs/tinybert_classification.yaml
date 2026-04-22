@@ -9,7 +9,7 @@ trainer:
 model:
   class_path: models.transformer_classification_module.TransformerClassificationModule
   init_args:
-    compile: false
+    compile: true
     lr: 2e-5
     lr_schedule: linear
     warmup_ratio: 0.1
@@ -22,6 +22,6 @@ data:
   eval_batch_size: 256
   sampler: mperclass
   m: 2
-  num_threads: 12
+  num_threads: 6
   max_length: 512
-  tokenizer_parallelism: true
+  tokenizer_parallelism: false
