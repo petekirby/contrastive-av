@@ -124,17 +124,26 @@ class TransformerContrastiveModule(pl.LightningModule):
     def on_validation_epoch_start(self):
         self._val_scores = []
         self._val_targets = []
+        self._train_metric_scores = []
+        self._train_metric_targets = []
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         scores, targets = pair_scores_and_targets(self, batch)
-        self._val_scores.append(scores)
-        self._val_targets.append(targets)
+        if dataloader_idx == 0:
+            self._val_scores.append(scores)
+            self._val_targets.append(targets)
+        elif dataloader_idx == 1:
+            self._train_metric_scores.append(scores)
+            self._train_metric_targets.append(targets)
 
     def on_validation_epoch_end(self):
         threshold, acc, f1 = contrastive_metrics(self._val_scores, self._val_targets, threshold=None)
         self.eval_threshold.fill_(float(threshold))
-        self.log("val_acc", acc, prog_bar=True, on_epoch=True)
-        self.log("val_f1", f1, prog_bar=True, on_epoch=True)
+        self.log("val_acc", acc, prog_bar=True, on_epoch=True, add_dataloader_idx=False)
+        self.log("val_f1", f1, prog_bar=True, on_epoch=True, add_dataloader_idx=False)
+        _, train_acc, train_f1 = contrastive_metrics(self._train_metric_scores, self._train_metric_targets, threshold=threshold)
+        self.log("train_acc", train_acc, prog_bar=False, on_epoch=True, add_dataloader_idx=False)
+        self.log("train_f1", train_f1, prog_bar=False, on_epoch=True, add_dataloader_idx=False)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         if torch.isnan(self.eval_threshold):

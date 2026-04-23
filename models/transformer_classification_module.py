@@ -66,7 +66,9 @@ class TransformerClassificationModule(pl.LightningModule):
         self.test_acc = BinaryAccuracy()
         self.test_f1 = BinaryF1Score()
         self.pan20_test_acc = BinaryAccuracy()
-        self.pan20_test_f1 = BinaryF1Score()        
+        self.pan20_test_f1 = BinaryF1Score()       
+        self.train_acc = BinaryAccuracy()
+        self.train_f1 = BinaryF1Score() 
 
         # Save hyperparameters for logging purposes 
         self.save_hyperparameters({
@@ -103,7 +105,9 @@ class TransformerClassificationModule(pl.LightningModule):
     # Collect validation scores for epoch end threshold calibration
     def on_validation_epoch_start(self):
         self._val_scores = []
-        self._val_targets = [] 
+        self._val_targets = []
+        self._train_metric_scores = []
+        self._train_metric_targets = []
 
     # Find optimal threshold via validation predictions, then reset for next epoch
     def on_validation_epoch_end(self):
@@ -119,24 +123,40 @@ class TransformerClassificationModule(pl.LightningModule):
         true = torch.cat(self._val_targets).int()
         self.val_acc.update(preds, true) 
         self.val_f1.update(preds, true)
-        self.log("val_acc", self.val_acc.compute(), prog_bar = True)
-        self.log("val_f1", self.val_f1.compute(), prog_bar = True)
+        self.log("val_acc", self.val_acc.compute(), prog_bar = True, add_dataloader_idx=False)
+        self.log("val_f1", self.val_f1.compute(), prog_bar = True, add_dataloader_idx=False)
         self.val_acc.reset()
         self.val_f1.reset()
+
+        # score PAN21 train pairs using that threshold
+        train_scores = torch.cat(self._train_metric_scores)
+        train_true = torch.cat(self._train_metric_targets).int()
+        train_preds = (train_scores >= threshold).int()
+
+        self.train_acc.update(train_preds, train_true)
+        self.train_f1.update(train_preds, train_true)
+        self.log("train_acc", self.train_acc.compute(), prog_bar=False, add_dataloader_idx=False)
+        self.log("train_f1", self.train_f1.compute(), prog_bar=False, add_dataloader_idx=False)
+        self.train_acc.reset()
+        self.train_f1.reset()
     
     # Compute predictions and accumulate metrics
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx = 0):
         inputs, labels = batch
         logits = self(**inputs)
-        
-        # Store sigmoid probabilities / scores and targets for threshold calibration
         scores = torch.sigmoid(logits)
-        self._val_scores.append(scores.detach().float().cpu())
-        self._val_targets.append(labels.detach().float().cpu())
+        
+        if dataloader_idx == 0:
+            # Store sigmoid probabilities / scores and targets for threshold calibration
+            self._val_scores.append(scores.detach().float().cpu())
+            self._val_targets.append(labels.detach().float().cpu())
 
-        # Also log validation loss for monitoring
-        loss = self.loss(logits, labels)
-        self.log("val_loss", loss, prog_bar = False, on_step = False, on_epoch = True, batch_size = labels.shape[0])
+            # Also log validation loss for monitoring
+            loss = self.loss(logits, labels)
+            self.log("val_loss", loss, prog_bar = False, on_step = False, on_epoch = True, batch_size = labels.shape[0], add_dataloader_idx = False)
+        elif dataloader_idx == 1:
+            self._train_metric_scores.append(scores.detach().float().cpu())
+            self._train_metric_targets.append(labels.detach().float().cpu())
     
     # Two test dataloaders: 0 = PAN21 (primary test set), 1 = PAN20
     def test_step(self, batch, batch_idx, dataloader_idx = 0):

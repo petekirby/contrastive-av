@@ -40,6 +40,7 @@ class PANDataModule(L.LightningDataModule):
         if stage in (None, "fit"):
             self.train_data = load_dataset("peterkirby/pan2020_dict_author_fandom_doc", "default", split="train")
             self.val_pairs = load_dataset("peterkirby/pan2020_dict_author_fandom_doc", "pan21", split="validation")
+            self.train_metric_pairs = load_dataset("peterkirby/pan2020_dict_author_fandom_doc", "pan21", split="train")
         if stage in (None, "test"):
             self.test_pairs = load_dataset("peterkirby/pan2020_dict_author_fandom_doc", "pan21", split="test")
             self.pan20_test_pairs = load_dataset("peterkirby/pan2020_dict_author_fandom_doc", "pan20", split="test")
@@ -88,7 +89,7 @@ class PANDataModule(L.LightningDataModule):
         )
     
     def val_dataloader(self):
-        return DataLoader(
+        val_loader = DataLoader(
             self.val_pairs,
             batch_size=self.eval_batch_size,
             shuffle=False,
@@ -96,6 +97,15 @@ class PANDataModule(L.LightningDataModule):
             persistent_workers=self.num_workers > 0,
             collate_fn=self.pair_collate_fn,
         )
+        train_metric_loader = DataLoader(
+            self.train_metric_pairs,
+            batch_size=self.eval_batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            persistent_workers=self.num_workers > 0,
+            collate_fn=self.pair_collate_fn,
+        )
+        return [val_loader, train_metric_loader]
 
     def test_dataloader(self):
         pan21_test_loader = DataLoader(
