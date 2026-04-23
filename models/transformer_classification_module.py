@@ -4,6 +4,7 @@ import lightning.pytorch as pl
 import torch
 import bitsandbytes as bnb
 import torch.nn as nn
+from kornia.losses import BinaryFocalLossWithLogits
 from transformers import AutoModelForSequenceClassification, get_scheduler
 from .optimizer_utils import split_weight_decay_params
 from helper_functions.contrastive_eval import calibrate_threshold
@@ -23,6 +24,8 @@ class TransformerClassificationModule(pl.LightningModule):
         warmup_ratio: float = 0.1,
         compile: bool = False,
         freeze_encoder: bool = False,
+        negatives_per_positive: int = 1,
+        gamma: float = 0.0,
     ):
         super().__init__()
 
@@ -34,8 +37,9 @@ class TransformerClassificationModule(pl.LightningModule):
             dtype = torch.bfloat16 if model_config.get("use_bf16") else None
         )
 
-        # BCE loss on a single logit 
-        self.loss_fn = nn.BCEWithLogitsLoss()
+        # Focal loss on a single logit 
+        alpha = negatives_per_positive / (negatives_per_positive + 1) # class balanced
+        self.loss_fn = BinaryFocalLossWithLogits(alpha=alpha, gamma=gamma, reduction="mean")
 
         # Enable transformer encoder freezing 
         if freeze_encoder:
@@ -76,6 +80,8 @@ class TransformerClassificationModule(pl.LightningModule):
             "lr_schedule": lr_schedule,
             "warmup_ratio": warmup_ratio,
             "freeze_encoder": freeze_encoder,
+            "negatives_per_positive": negatives_per_positive,
+            "gamma": gamma,
         })
 
     # Object returned with logits. Given num_labels = 1, squeeze (batch_size, 1) -> (batch_size,)
@@ -83,11 +89,14 @@ class TransformerClassificationModule(pl.LightningModule):
         outputs = self.model(**inputs)
         return outputs.logits.squeeze(-1)
 
+    def loss(self, logits, labels):
+        return self.loss_fn(logits.unsqueeze(1), labels.float().unsqueeze(1)) # BCE needs float labels
+
     # Unpack tokenized pair dict and binary labels
     def training_step(self, batch, batch_idx): # batch_idx required by Lightning module even if unused
         inputs, labels = batch
         logits = self(**inputs)
-        loss = self.loss_fn(logits, labels.float()) # BCE needs float labels
+        loss = self.loss(logits, labels)
         self.log("train_loss", loss, prog_bar = True, on_step = True, on_epoch = True, batch_size = labels.shape[0])
         return loss    
     
@@ -126,7 +135,7 @@ class TransformerClassificationModule(pl.LightningModule):
         self._val_targets.append(labels.detach().float().cpu())
 
         # Also log validation loss for monitoring
-        loss = self.loss_fn(logits, labels.float())
+        loss = self.loss(logits, labels)
         self.log("val_loss", loss, prog_bar = False, on_step = False, on_epoch = True, batch_size = labels.shape[0])
     
     # Two test dataloaders: 0 = PAN21 (primary test set), 1 = PAN20

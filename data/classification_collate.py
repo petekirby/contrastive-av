@@ -18,10 +18,11 @@ def has_padding(encoding, max_length):
 
 # Collects individual documents into (text_A, text_B) pairs for classification based training via triplet mining, forming pairs, and tokenization
 class ClassificationCollator:
-    def __init__(self, model_name, max_length, prefix = ""):
+    def __init__(self, model_name, max_length, prefix = "", negatives_per_positive = 1):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast = True)
         self.max_length = max_length
         self.prefix = prefix
+        self.negatives_per_positive = negatives_per_positive
 
     # Batch from MPerClassSampler (ensures at least m documents per author), each item consists of 'text' and 'author_int'
     def __call__(self, batch, max_chars = None):
@@ -30,26 +31,33 @@ class ClassificationCollator:
         texts = [x["text"] for x in batch]
         labels = torch.tensor([x["author_int"] for x in batch], dtype = torch.long)
 
-        # Triplet mining to form positive and negative pairs, one (anchor, positive, negative) triplet per sample 
-        a, p, n = lmu.get_random_triplet_indices(labels, t_per_anchor = 1)
+        # Triplet mining to form positive and negative pairs
+        if self.negatives_per_positive >= len(labels) - 2: # e.g. batch size = 8, m = 2, negatives_per_positive = 6
+            a, p, n = lmu.convert_to_triplets(None, labels, t_per_anchor="all")
+        else:
+            a, p, n = lmu.get_random_triplet_indices(labels, t_per_anchor = self.negatives_per_positive)
 
         # Build positive pairs (same author, label = 1) and negative pairs (diff author, label = 0)
         pair_texts_a = []
         pair_texts_b = []
         pair_labels = []
 
+        seen_pos = set()
         for i in range(len(a)):
-            text_a = random_text_start(texts[a[i]], max_chars)
+            a_idx, p_idx = a[i].item(), p[i].item()
+            text_a = random_text_start(texts[a_idx], max_chars)
             if self.prefix:
                 text_a = self.prefix + text_a
 
-            # Positive pair
-            text_p = random_text_start(texts[p[i]], max_chars)
-            if self.prefix:
-                text_p = self.prefix + text_p
-            pair_texts_a.append(text_a)
-            pair_texts_b.append(text_p)
-            pair_labels.append(1)
+            # Positive pair, once per anchor/positive; additional tuples add negatives only
+            if (a_idx, p_idx) not in seen_pos:
+                seen_pos.add((a_idx, p_idx))
+                text_p = random_text_start(texts[p_idx], max_chars)
+                if self.prefix:
+                    text_p = self.prefix + text_p
+                pair_texts_a.append(text_a)
+                pair_texts_b.append(text_p)
+                pair_labels.append(1)
 
             # Negative pair
             text_n = random_text_start(texts[n[i]], max_chars)

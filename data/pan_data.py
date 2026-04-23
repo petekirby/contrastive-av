@@ -52,7 +52,7 @@ class PANDataModule(L.LightningDataModule):
             self.collate_fn = ContrastiveCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left, random_span=self.random_span)
             self.pair_collate_fn = ContrastivePairCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left)
         elif isinstance(model, TransformerClassificationModule):
-            self.collate_fn = ClassificationCollator(tokenizer_name, self.max_length, prefix = self.text_prefix)
+            self.collate_fn = ClassificationCollator(tokenizer_name, self.max_length, prefix = self.text_prefix, negatives_per_positive=model.hparams.negatives_per_positive)
             self.pair_collate_fn = ClassificationPairCollator(tokenizer_name, self.max_length, prefix = self.text_prefix)
         else:
             raise ValueError(f"model unrecognized: {type(model).__name__}")

@@ -27,4 +27,5 @@ def main():
 if __name__ == "__main__":
     warnings.filterwarnings("ignore", category=FutureWarning)
     torch.set_float32_matmul_precision("high")
+    torch._dynamo.config.capture_scalar_outputs = True
     main()
