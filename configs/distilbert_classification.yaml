@@ -1,7 +1,7 @@
 seed_everything: 1000                                                                                                                        
                                         
 trainer:                                                                                                                                   
-  max_epochs: 3                                                                                                                            
+  max_epochs: 10                                                                                                                            
   accelerator: auto
   devices: 1                                                                                                                               
   precision: bf16-mixed
@@ -25,9 +25,7 @@ model:
     freeze_encoder: false                   
     model_config:                                                                                                                          
       model_name_or_path: distilbert/distilbert-base-uncased
-      pooling: cls                                                                                                                         
-      head_type: none                       
-      normalize: false                                                                                                                     
+      attn_implementation: flash_attention_2                                                                                                   
                                             
 data:                                                                                                                                      
   batch_size: 64

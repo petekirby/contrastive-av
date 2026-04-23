@@ -23,13 +23,6 @@ DISTANCE_CONFIGS = {
 
 
 LOSS_CONFIGS = {
-    "ntxent": {
-        "loss_class": losses.NTXentLoss,
-        "loss_config": {
-            "temperature": 0.05,
-        },
-        "loss_optim_config": {},
-    },
     "supcon": {
         "loss_class": losses.SupConLoss,
         "loss_config": {
@@ -50,7 +43,7 @@ LOSS_CONFIGS = {
     "multisimilarity": {
         "loss_class": losses.MultiSimilarityLoss,
         "loss_config": {
-            "alpha": 10,
+            "alpha": 2,
             "beta": 50,
             "base": 0.5,
         },
@@ -77,6 +70,8 @@ LOSS_CONFIGS = {
     "proxyanchor": {
         "loss_class": losses.ProxyAnchorLoss,
         "loss_config": {
+            "num_classes": 238815, # number of distinct authors in training set
+            "embedding_size": 312, # TinyBERT's embedding dimension
             "margin": 0.1,
             "alpha": 32,
         },
@@ -89,7 +84,9 @@ LOSS_CONFIGS = {
     "softtriple": {
         "loss_class": losses.SoftTripleLoss,
         "loss_config": {
-            "centers_per_class": 10,
+            "num_classes": 238815, # number of distinct authors in training set
+            "embedding_size": 312, # TinyBERT's embedding dimension
+            "centers_per_class": 2,
             "la": 20,
             "gamma": 0.1,
             "margin": 0.01,

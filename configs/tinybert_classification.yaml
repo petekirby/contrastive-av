@@ -20,8 +20,8 @@ model:
     lr: 2e-5
     lr_schedule: linear
     warmup_ratio: 0.1
-    negatives_per_positive: 4
-    gamma: 0.5
+    negatives_per_positive: 1
+    gamma: 0
     model_config:
       model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       attn_implementation: flash_attention_2

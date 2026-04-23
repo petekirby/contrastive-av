@@ -18,8 +18,8 @@ trainer:
 model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
-    compile: false
-    lr: 2e-5 # was 4e-5
+    compile: true
+    lr: 2e-5
     lr_schedule: linear
     warmup_ratio: 0.1
     # microbatch_size: 256 # GradCache
@@ -27,12 +27,8 @@ model:
     model_config:
       model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       attn_implementation: flash_attention_2
-      pooling: cls_concat
-      concat_layers: 4
-      head_type: ln_gelu_residual
-      projection_hidden_dim: 2496
-      # pooling: mean
-      # head_type: none
+      pooling: mean
+      head_type: none
       normalize: true
 
     loss_dict:
