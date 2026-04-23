@@ -1,10 +1,17 @@
-seed_everything: 42                                                 
+seed_everything: 1000                                                 
                                                                     
 trainer:                                                            
   max_epochs: 3                                                     
   accelerator: auto                                                 
   devices: 1                                                        
-  precision: bf16-mixed                                             
+  precision: bf16-mixed       
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: contrastive-av
+      entity: peterkirby
+      log_model: true
+      save_dir: output                                      
                                                                     
 model:                                                              
   class_path: models.transformer_classification_module.TransformerClassificationModule                          

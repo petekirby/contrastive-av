@@ -214,7 +214,7 @@ class TransformerClassificationModule(pl.LightningModule):
         param_groups = [g for g in param_groups if g["params"]]
 
         # AdamW optimizer with linear warmup + decay schedule
-        optimizer = bnb.optim.PagedAdamW32bit(param_groups, betas=(self.beta1, self.beta2), eps=self.eps) # it's free VRAM
+        optimizer = bnb.optim.PagedAdamW8bit(param_groups, betas=(self.beta1, self.beta2), eps=self.eps) # it's free VRAM
         total_steps = self.trainer.estimated_stepping_batches
         scheduler = get_scheduler(
             name = self.hparams.lr_schedule,

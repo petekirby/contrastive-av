@@ -12,15 +12,16 @@ class TrainCLI(LightningCLI):
 
 
 def main():
+    checkpoint_callback = ModelCheckpoint(monitor="val_f1", mode="max", save_top_k=1, save_last=False, filename="{epoch}-{step}-{val_f1:.4f}")
     TrainCLI(
         LightningModule,
         PANDataModule,
         subclass_mode_model=True,
-        seed_everything_default=42,
+        seed_everything_default=1000,
         save_config_kwargs={"overwrite": True},
         trainer_defaults={
             "default_root_dir": "output",
-            "callbacks": [ModelCheckpoint(monitor="val_f1", mode="max", save_top_k=1, save_last=True)],
+            "callbacks": [checkpoint_callback],
         },
     )
 
