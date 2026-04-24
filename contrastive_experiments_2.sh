@@ -15,12 +15,12 @@ run_experiment() {
     "$@"
 }
 
-run_experiment "contrastive-bs=1024" \
+run_experiment "contrastive-bs=256" \
   --trainer.max_epochs=10 \
   --model.init_args.microbatch_size=256 \
   --data.batch_size=512
 
-run_experiment "contrastive-bs=1024" \
+run_experiment "contrastive-bs=512" \
   --trainer.max_epochs=10 \
   --model.init_args.microbatch_size=256 \
   --data.batch_size=1024
@@ -37,7 +37,7 @@ run_experiment "long-contrastive-bs=1024" \
   --data.batch_size=1024
 
 # Gradient accumulation
-run_experiment "long-contrastive-accumulate=1024" \
+run_experiment "long-contrastive-accum=1024" \
   --trainer.max_epochs=40 \
   --data.batch_size=256 \
   --trainer.accumulate_grad_batches=4
