@@ -4,11 +4,14 @@ from lightning.pytorch import LightningModule
 from data.pan_data import PANDataModule
 import warnings
 import torch
+import wandb
 
 
 class TrainCLI(LightningCLI):
     def after_fit(self):
         self.trainer.test(model=self.model, datamodule=self.datamodule, ckpt_path="best")
+        for ext in ("yaml", "csv"):
+            wandb.save(f"{self.trainer.log_dir}/*.{ext}", policy="now")
 
 
 def main():
