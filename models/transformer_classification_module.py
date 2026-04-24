@@ -25,6 +25,7 @@ class TransformerClassificationModule(pl.LightningModule):
         compile: bool = False,
         freeze_encoder: bool = False,
         negatives_per_positive: int = 1,
+        alpha: float | None = None,
         gamma: float = 0.0,
     ):
         super().__init__()
@@ -37,8 +38,9 @@ class TransformerClassificationModule(pl.LightningModule):
             dtype = torch.bfloat16 if model_config.get("use_bf16") else None
         )
 
-        # Focal loss on a single logit 
-        alpha = negatives_per_positive / (negatives_per_positive + 1) # class balanced
+        # Focal loss on a single logit
+        if alpha is None:
+            alpha = negatives_per_positive / (negatives_per_positive + 1) # class balanced
         self.loss_fn = BinaryFocalLossWithLogits(alpha=alpha, gamma=gamma, reduction="mean")
 
         # Enable transformer encoder freezing 
@@ -83,6 +85,7 @@ class TransformerClassificationModule(pl.LightningModule):
             "warmup_ratio": warmup_ratio,
             "freeze_encoder": freeze_encoder,
             "negatives_per_positive": negatives_per_positive,
+            "alpha": alpha,
             "gamma": gamma,
         })
 
