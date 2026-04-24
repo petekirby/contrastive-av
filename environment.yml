@@ -4,6 +4,10 @@ channels:
   - nodefaults
 dependencies:
   - python=3.12
+  - cuda-version=12.8
+  - cuda-driver-dev
+  - cuda-cudart-dev
+  - cuda-nvcc
   - accelerate
   - datasets
   - huggingface_hub
