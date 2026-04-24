@@ -17,7 +17,6 @@ dependencies:
   - setuptools
   - transformers
   - pip:
-      - --no-cache-dir
       - --index-url https://download.pytorch.org/whl/cu128
       - --extra-index-url https://pypi.org/simple
       - torch==2.10.0
@@ -30,7 +29,6 @@ dependencies:
       - kornia-rs==0.1.10
       - lightning==2.6.1
       - lightning-utilities==0.15.3
-      - pillow==12.0.0
       - pytorch-lightning==2.6.1
       - "jsonargparse[signatures]>=4.27.7"
       - pytorch-metric-learning==2.9.0
