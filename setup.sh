@@ -10,5 +10,8 @@ echo "alias miniconda='source /root/miniconda3/etc/profile.d/conda.sh && conda a
 
 conda env create -f environment.yml || conda env update -f environment.yml
 
+conda activate contrastive-av
+export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+
 conda run -n contrastive-av python -m pip install \
   "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.9.0/flash_attn-2.8.3+cu128torch2.10-cp312-cp312-linux_x86_64.whl"
