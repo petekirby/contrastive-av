@@ -7,7 +7,7 @@ losses=(supcon contrastive multisimilarity circle generalized_lifted proxyanchor
 batch_sizes=(8 16 32 64 128 256)
 
 for pooling in "${poolings[@]}"; do
-  run_name=$(printf "contrastive: pooling=%s" "$pooling")
+  run_name=$(printf "contrastive-pooling=%s" "$pooling")
   echo "Running ${run_name}"
 
   python train.py fit \
@@ -17,7 +17,7 @@ for pooling in "${poolings[@]}"; do
 done
 
 for head in "${heads[@]}"; do
-  run_name=$(printf "contrastive: head=%s" "$head")
+  run_name=$(printf "contrastive-head=%s" "$head")
   echo "Running ${run_name}"
 
   python train.py fit \
@@ -27,7 +27,7 @@ for head in "${heads[@]}"; do
 done
 
 for loss in "${losses[@]}"; do
-  run_name=$(printf "contrastive: loss=%s" "$loss")
+  run_name=$(printf "contrastive-loss=%s" "$loss")
   echo "Running ${run_name}"
 
   python train.py fit \
@@ -37,7 +37,7 @@ for loss in "${losses[@]}"; do
 done
 
 for bs in "${batch_sizes[@]}"; do
-  run_name=$(printf "contrastive: bs=%d" "$bs")
+  run_name=$(printf "contrastive-bs=%d" "$bs")
   echo "Running ${run_name}"
 
   python train.py fit \
