@@ -32,7 +32,7 @@ class TransformerEmbeddingModel(nn.Module):
         if pooling not in {"cls", "mean", "max", "mean_first_last", "mean_first_last_concat", "bert_pooler", "cls_concat", "last"}:
             raise ValueError(f"pooling: {pooling}")
 
-        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "ln_gelu_residual", "two_linear_layer", "ln_gelu_residual_dropout"}:
+        if head_type not in {"none", "simcse", "simclr", "diffcse", "byol", "ln_gelu_residual", "two_linear_layer", "ln_gelu_residual_dropout", "ln_gelu"}:
             raise ValueError(f"head_type: {head_type}")
 
         self.pooling = pooling
@@ -156,6 +156,16 @@ class TransformerEmbeddingModel(nn.Module):
                 nn.Linear(hidden_dim, output_dim, bias=False),
             ))
 
+        # switch to layer-norm and GELU in the MLP, without a residual or dropout
+        elif head_type == "ln_gelu":
+            output_dim = pooled_size # has to be same size
+            self.projection = nn.Sequential(
+                nn.Linear(pooled_size, hidden_dim, bias=True),
+                nn.LayerNorm(hidden_dim),
+                nn.GELU(),
+                nn.Linear(hidden_dim, output_dim, bias=False),
+            )
+    
         self.embedding_dim = output_dim
 
     @staticmethod
