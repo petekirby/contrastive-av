@@ -8,7 +8,7 @@ shift
 batch_sizes=("$@")
 
 for bs in "${batch_sizes[@]}"; do
-  run_name=$(printf "contrastive-bs=%d-lr=%s" "$bs" "$lr")
+  run_name=$(printf "contrastive-bs=%d-lr=%s" "$bs" "$learning_rate")
   echo "Running ${run_name} on CUDA device ${cuda_device}"
 
   CUDA_VISIBLE_DEVICES="$cuda_device" python train.py fit \
