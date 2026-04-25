@@ -13,7 +13,8 @@ from .classification_collate import ClassificationCollator, ClassificationPairCo
 
 
 class PANDataModule(L.LightningDataModule):
-    def __init__(self, batch_size=64, eval_batch_size=None, sampler="mperclass", m=2, num_threads=8, max_length=512, text_prefix="", tokenizer_parallelism=False, tokenizer_name=None, padding_left=False, random_span=True):
+    def __init__(self, batch_size=64, eval_batch_size=None, sampler="mperclass", m=2, num_threads=8, max_length=512, text_prefix="", tokenizer_parallelism=False, tokenizer_name=None, padding_left=False, random_span=True, 
+    prefetch_factor=None):
         super().__init__()
         self.batch_size = batch_size
         self.eval_batch_size = eval_batch_size or batch_size
@@ -26,6 +27,7 @@ class PANDataModule(L.LightningDataModule):
         self.tokenizer_name = tokenizer_name
         self.padding_left = padding_left
         self.random_span = random_span
+        self.prefetch_factor = prefetch_factor
         self.collate_fn = None
         self.pair_collate_fn = None
         if self.tokenizer_parallelism:
@@ -71,6 +73,7 @@ class PANDataModule(L.LightningDataModule):
                 batch_size=self.batch_size,
                 sampler=sampler,
                 num_workers=self.num_workers,
+                prefetch_factor=self.prefetch_factor,
                 persistent_workers=self.num_workers > 0,
                 pin_memory=True,
                 drop_last=True,
@@ -82,6 +85,7 @@ class PANDataModule(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
+            prefetch_factor=self.prefetch_factor,
             persistent_workers=self.num_workers > 0,
             pin_memory=True,
             drop_last=True,
