@@ -4,7 +4,7 @@ set -euo pipefail
 poolings=() #(mean max cls mean_first_last mean_first_last_concat cls_concat)
 heads=() #(none simcse ln_gelu_residual two_linear_layer)
 losses=() #(contrastive multisimilarity circle generalized_lifted proxyanchor softtriple)
-batch_sizes=(128 64 32 16 8 256)
+batch_sizes=(8)
 
 for pooling in "${poolings[@]}"; do
   run_name=$(printf "contrastive-pooling=%s" "$pooling")

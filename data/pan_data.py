@@ -14,7 +14,7 @@ from .classification_collate import ClassificationCollator, ClassificationPairCo
 
 class PANDataModule(L.LightningDataModule):
     def __init__(self, batch_size=64, eval_batch_size=None, sampler="mperclass", m=2, num_threads=8, max_length=512, text_prefix="", tokenizer_parallelism=False, tokenizer_name=None, padding_left=False, random_span=True, 
-    prefetch_factor=None):
+    prefetch_factor=2):
         super().__init__()
         self.batch_size = batch_size
         self.eval_batch_size = eval_batch_size or batch_size
