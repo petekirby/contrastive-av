@@ -16,7 +16,7 @@ for lr in "${learning_rates[@]}"; do
       --trainer.accelerator=cuda \
       --trainer.devices=1 \
       --data.batch_size="$bs" \
-      --optimizer.lr="$lr" \
+      --optimizer.init_args.lr="$lr" \
       --trainer.logger.init_args.name="$run_name"
   done
 done
