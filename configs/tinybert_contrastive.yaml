@@ -42,5 +42,5 @@ data:
   m: 2
   num_threads: 24
   max_length: 512
-  tokenizer_parallelism: true
-  prefetch_factor: 6
+  tokenizer_parallelism: false
+  prefetch_factor: 1
