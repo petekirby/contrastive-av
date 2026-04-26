@@ -15,17 +15,17 @@ run_experiment() {
     "$@"
 }
 
-run_experiment "contrastive-bs=512-lr=8e-5" \
-  --trainer.max_epochs=10 \
-  --model.init_args.microbatch_size=256 \
-  --data.batch_size=512 \
-  --model.init_args.lr=8e-5
+#run_experiment "contrastive-bs=512-lr=8e-5" \
+#  --trainer.max_epochs=10 \
+#  --model.init_args.microbatch_size=256 \
+#  --data.batch_size=512 \
+#  --model.init_args.lr=8e-5
 
-run_experiment "contrastive-bs=1024-lr=8e-5" \
-  --trainer.max_epochs=10 \
-  --model.init_args.microbatch_size=256 \
-  --data.batch_size=1024 \
-  --model.init_args.lr=8e-5
+#run_experiment "contrastive-bs=1024-lr=8e-5" \
+#  --trainer.max_epochs=10 \
+#  --model.init_args.microbatch_size=256 \
+#  --data.batch_size=1024 \
+#  --model.init_args.lr=8e-5
 
 # Long Baseline: batch size 256
 run_experiment "long-contrastive-bs=256-lr=8e-5" \
