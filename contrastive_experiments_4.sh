@@ -26,11 +26,6 @@ for lr in "${learning_rates[@]}"; do
     --model.init_args.microbatch_size=256 \
     --data.batch_size=$bs \
     --model.init_args.lr="$lr"
-  run_experiment "long-contrastive-bs=$bs-lr=$lr" \
-    --trainer.max_epochs=40 \
-    --model.init_args.microbatch_size=256 \
-    --data.batch_size=$bs \
-    --model.init_args.lr="$lr"
 done
 
 
