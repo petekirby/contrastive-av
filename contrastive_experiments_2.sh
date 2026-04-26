@@ -17,6 +17,12 @@ run_experiment() {
 
 lr="$1"
 
+# Short Baseline: batch size 256
+run_experiment "contrastive-bs=256-lr=$lr" \
+  --trainer.max_epochs=10 \
+  --data.batch_size=256 \
+  --model.init_args.lr="$lr"
+
 run_experiment "contrastive-bs=512-lr=$lr" \
   --trainer.max_epochs=10 \
   --model.init_args.microbatch_size=256 \
