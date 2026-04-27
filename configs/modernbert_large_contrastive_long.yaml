@@ -45,6 +45,6 @@ data:
   num_threads: 23
   max_length: 8192
   short_length: 512
-  short_chance: 0.95
+  short_chance: 0.98
   tokenizer_parallelism: false
   prefetch_factor: 1
