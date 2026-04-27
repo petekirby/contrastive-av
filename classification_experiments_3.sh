@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIGS=(
-  "configs/tinybert_classification.yaml"
-  "configs/tinybert_classification_focal.yaml"
-)
-
-for config in "${CONFIGS[@]}"; do
+for suffix in bce focal; do
   for npp in 1 2 4; do
-    echo "Running $config with negatives_per_positive=$npp"
+    run_name="classification-${suffix}-npp=${npp}"
+    echo "Running ${run_name}"
 
-    python train.py \
-      --config "$config" \
-      --negatives_per_positive "$npp"
+    python train.py fit \
+      --config="configs/tinybert_classification_${suffix}.yaml" \
+      --trainer.accelerator=cuda \
+      --trainer.devices=1 \
+      --model.negatives_per_positive="$npp" \
+      --trainer.logger.init_args.name="$run_name"
   done
 done
+
+echo "Done."
