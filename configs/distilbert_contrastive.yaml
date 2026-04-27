@@ -26,7 +26,7 @@ model:
       use_bf16: true
       attn_implementation: flash_attention_2
       pooling: mean
-      head_type: ln_gelu_residual
+      head_type: none
       normalize: true
 
     loss_dict:

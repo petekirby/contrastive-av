@@ -29,7 +29,7 @@ model:
       attn_implementation: flash_attention_2
 
 data:
-  batch_size: 16
+  batch_size: 8
   eval_batch_size: 32
   sampler: mperclass
   m: 2
