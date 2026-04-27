@@ -21,7 +21,7 @@ temperatures=("$@")
 
 for temp in "${temperatures[@]}"; do
   run_experiment "long-contrastive-bs=$bs-lr=$lr-temp=$temp" \
-    --model.init_args.loss_dict.loss_config.temperature="$temp"
+    --model.init_args.loss_dict.loss_config="{temperature: $temp}"
 done
 
 echo "Done."
