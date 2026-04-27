@@ -24,8 +24,8 @@ model:
     model_config:
       model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       attn_implementation: flash_attention_2
-      pooling: mean_first_last
-      head_type: ln_gelu_residual
+      pooling: mean_first_last # mean was actually best
+      head_type: ln_gelu_residual # none was actually best
       normalize: true
 
     loss_dict:

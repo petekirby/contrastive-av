@@ -17,19 +17,16 @@ model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
     compile: true
-    lr: 12e-5 # was 8e-5
-    weight_decay: 1e-5
-    beta2: 0.98
-    eps: 1e-6
+    lr: 4e-4
     lr_schedule: linear
     warmup_ratio: 0.1
-    microbatch_size: 32
+    microbatch_size: 256 # GradCache
     model_config:
-      model_name_or_path: answerdotai/ModernBERT-large
+      model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       use_bf16: true
       attn_implementation: flash_attention_2
       pooling: mean
-      head_type: ln_gelu_residual
+      head_type: none
       normalize: true
 
     loss_dict:
@@ -39,7 +36,7 @@ model:
 
 data:
   batch_size: 512
-  eval_batch_size: 32
+  eval_batch_size: 256
   sampler: mperclass
   m: 2
   num_threads: 24
