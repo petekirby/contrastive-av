@@ -30,6 +30,8 @@ model:
 
     loss_dict:
       name: supcon
+      loss_config:
+        temperature: 0.01
 
 data:
   batch_size: 1024
