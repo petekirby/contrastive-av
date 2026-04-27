@@ -17,7 +17,7 @@ model:
   class_path: models.transformer_classification_module.TransformerClassificationModule
   init_args:
     compile: true
-    lr: 2e-5
+    lr: 4e-5
     lr_schedule: linear
     warmup_ratio: 0.1
     negatives_per_positive: 1
@@ -28,11 +28,11 @@ model:
       attn_implementation: flash_attention_2
 
 data:
-  batch_size: 16
-  eval_batch_size: 256
+  batch_size: 8
+  eval_batch_size: 128
   sampler: mperclass
   m: 2
-  num_threads: 6
+  num_threads: 12
   max_length: 512
   tokenizer_parallelism: false
   prefetch_factor: 1
