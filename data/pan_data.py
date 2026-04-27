@@ -16,7 +16,7 @@ from .baseline_collate import BaselineCollator, BaselinePairCollator
 
 class PANDataModule(L.LightningDataModule):
     def __init__(self, batch_size=64, eval_batch_size=None, sampler="mperclass", m=2, num_threads=8, max_length=512, text_prefix="", tokenizer_parallelism=False, tokenizer_name=None, padding_left=False, random_span=True, 
-    prefetch_factor=2):
+    prefetch_factor=2, short_length=None, short_chance=0):
         super().__init__()
         self.batch_size = batch_size
         self.eval_batch_size = eval_batch_size or batch_size
@@ -30,6 +30,8 @@ class PANDataModule(L.LightningDataModule):
         self.padding_left = padding_left
         self.random_span = random_span
         self.prefetch_factor = prefetch_factor
+        self.short_length = short_length
+        self.short_cance = short_chance
         self.collate_fn = None
         self.pair_collate_fn = None
         if self.tokenizer_parallelism:
@@ -61,7 +63,7 @@ class PANDataModule(L.LightningDataModule):
         tokenizer_name = self.tokenizer_name or model.hparams.model_config["model_name_or_path"]
         self.max_length = min(self.max_length, model.model.config.max_position_embeddings)
         if isinstance(model, TransformerContrastiveModule):
-            self.collate_fn = ContrastiveCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left, random_span=self.random_span)
+            self.collate_fn = ContrastiveCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left, random_span=self.random_span, short_length=self.short_length, short_chance=self.short_chance)
             self.pair_collate_fn = ContrastivePairCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left)
         elif isinstance(model, TransformerClassificationModule):
             self.collate_fn = ClassificationCollator(tokenizer_name, self.max_length, prefix = self.text_prefix, negatives_per_positive=model.hparams.negatives_per_positive)

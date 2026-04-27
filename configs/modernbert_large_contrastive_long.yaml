@@ -1,0 +1,50 @@
+seed_everything: 1000
+
+trainer:
+  max_epochs: 40
+  accelerator: auto
+  devices: 1
+  precision: bf16-mixed
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: contrastive-av
+      entity: peterkirby
+      log_model: true
+      save_dir: output
+
+model:
+  class_path: models.transformer_contrastive_module.TransformerContrastiveModule
+  init_args:
+    compile: true
+    lr: 12e-5 # was 8e-5
+    weight_decay: 1e-5
+    beta2: 0.98
+    eps: 1e-6
+    lr_schedule: linear
+    warmup_ratio: 0.1
+    microbatch_size: 32
+    model_config:
+      model_name_or_path: answerdotai/ModernBERT-large
+      use_bf16: true
+      attn_implementation: flash_attention_2
+      pooling: mean
+      head_type: none
+      normalize: true
+
+    loss_dict:
+      name: supcon
+      loss_config:
+        temperature: 0.01
+
+data:
+  batch_size: 1024
+  eval_batch_size: 32
+  sampler: mperclass
+  m: 2
+  num_threads: 24
+  max_length: 8192
+  short_length: 512
+  short_chance: 0.9
+  tokenizer_parallelism: false
+  prefetch_factor: 1
