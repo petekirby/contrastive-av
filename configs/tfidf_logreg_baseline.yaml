@@ -1,0 +1,44 @@
+seed_everything: 1000
+
+trainer:
+  max_epochs: 1
+  accelerator: auto
+  devices: 1
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: contrastive-av
+      entity: peterkirby
+      log_model: true
+      save_dir: output
+
+model:
+  class_path: models.baseline_model_module.BaselineModelModule
+  init_args:
+    pair_features: abs_diff
+    negatives_per_positive: 1
+    tfidf_config:
+      analyzer: char_wb
+      ngram_range: [3, 5]
+      min_df: 3
+      max_df: 0.95
+      max_features: 100000
+      sublinear_tf: true
+      lowercase: true
+    classifier_config:
+      C: 1.0
+      class_weight: balanced
+      max_iter: 500
+      solver: liblinear
+      random_state: 1000
+
+data:
+  batch_size: 64
+  eval_batch_size: 256
+  sampler: mperclass
+  m: 2
+  num_threads: 2
+  max_length: 512
+  tokenizer_parallelism: false
+  random_span: false
+  prefetch_factor: 2

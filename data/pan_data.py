@@ -9,7 +9,9 @@ from pytorch_metric_learning.samplers import MPerClassSampler
 from .contrastive_collate import ContrastiveCollator, ContrastivePairCollator
 from models.transformer_contrastive_module import TransformerContrastiveModule
 from models.transformer_classification_module import TransformerClassificationModule                                                       
-from .classification_collate import ClassificationCollator, ClassificationPairCollator          
+from models.baseline_model_module import BaselineModelModule
+from .classification_collate import ClassificationCollator, ClassificationPairCollator
+from .baseline_collate import BaselineCollator, BaselinePairCollator
 
 
 class PANDataModule(L.LightningDataModule):
@@ -49,6 +51,13 @@ class PANDataModule(L.LightningDataModule):
         if self.collate_fn is not None and self.pair_collate_fn is not None:
             return
         model = self.trainer.lightning_module
+
+        if isinstance(model, BaselineModelModule):
+            max_chars = self.max_length * 5
+            self.collate_fn = BaselineCollator(prefix=self.text_prefix, random_span=self.random_span, negatives_per_positive=model.hparams.negatives_per_positive, max_chars=max_chars)
+            self.pair_collate_fn = BaselinePairCollator(prefix=self.text_prefix, max_chars=max_chars)
+            return
+
         tokenizer_name = self.tokenizer_name or model.hparams.model_config["model_name_or_path"]
         self.max_length = min(self.max_length, model.model.config.max_position_embeddings)
         if isinstance(model, TransformerContrastiveModule):
