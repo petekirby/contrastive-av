@@ -23,7 +23,7 @@ model:
     eps: 1e-6
     lr_schedule: linear
     warmup_ratio: 0.1
-    microbatch_size: 8
+    microbatch_size: 4
     model_config:
       model_name_or_path: answerdotai/ModernBERT-large
       use_bf16: true
@@ -39,7 +39,7 @@ model:
 
 data:
   batch_size: 1024
-  eval_batch_size: 8
+  eval_batch_size: 4
   sampler: mperclass
   m: 2
   num_threads: 23
