@@ -31,7 +31,7 @@ class PANDataModule(L.LightningDataModule):
         self.random_span = random_span
         self.prefetch_factor = prefetch_factor
         self.short_length = short_length
-        self.short_cance = short_chance
+        self.short_chance = short_chance
         self.collate_fn = None
         self.pair_collate_fn = None
         if self.tokenizer_parallelism:
