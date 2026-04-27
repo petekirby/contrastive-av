@@ -1,0 +1,42 @@
+seed_everything: 1000
+
+trainer:
+  max_epochs: 40
+  accelerator: auto
+  devices: 1
+  precision: bf16-mixed
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: contrastive-av
+      entity: peterkirby
+      log_model: true
+      save_dir: output
+
+model:
+  class_path: models.transformer_contrastive_module.TransformerContrastiveModule
+  init_args:
+    compile: true
+    lr: 4e-4
+    lr_schedule: linear
+    warmup_ratio: 0.1
+    microbatch_size: 256 # GradCache
+    model_config:
+      model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
+      attn_implementation: flash_attention_2
+      pooling: mean_first_last
+      head_type: ln_gelu_residual
+      normalize: true
+
+    loss_dict:
+      name: supcon
+
+data:
+  batch_size: 1024
+  eval_batch_size: 256
+  sampler: mperclass
+  m: 2
+  num_threads: 24
+  max_length: 512
+  tokenizer_parallelism: false
+  prefetch_factor: 1
