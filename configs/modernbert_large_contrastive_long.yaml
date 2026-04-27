@@ -16,14 +16,14 @@ trainer:
 model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
-    compile: true
+    compile: false
     lr: 12e-5 # was 8e-5
     weight_decay: 1e-5
     beta2: 0.98
     eps: 1e-6
     lr_schedule: linear
     warmup_ratio: 0.1
-    microbatch_size: 32
+    microbatch_size: 16
     model_config:
       model_name_or_path: answerdotai/ModernBERT-large
       use_bf16: true
@@ -39,10 +39,10 @@ model:
 
 data:
   batch_size: 1024
-  eval_batch_size: 32
+  eval_batch_size: 16
   sampler: mperclass
   m: 2
-  num_threads: 24
+  num_threads: 23
   max_length: 8192
   short_length: 512
   short_chance: 0.9
