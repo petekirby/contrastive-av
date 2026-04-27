@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-for suffix in bce focal; do
-  for npp in 1 2 4; do
+for suffix in focal bce; do
+  for npp in 4 2 1; do
     run_name="classification-${suffix}-npp=${npp}"
     echo "Running ${run_name}"
 
