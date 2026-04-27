@@ -1,7 +1,7 @@
 seed_everything: 1000
 
 trainer:
-  max_epochs: 1
+  max_epochs: 3
   accelerator: auto
   devices: 1
   logger:
@@ -18,17 +18,17 @@ model:
     pair_features: abs_diff
     negatives_per_positive: 1
     tfidf_config:
-      analyzer: char_wb
-      ngram_range: [3, 5]
+      analyzer: word
+      ngram_range: [1, 2]
       min_df: 3
       max_df: 0.95
-      max_features: 100000
+      max_features: 50000
       sublinear_tf: true
       lowercase: true
     classifier_config:
       C: 1.0
       class_weight: balanced
-      max_iter: 500
+      max_iter: 300
       solver: liblinear
       random_state: 1000
 
@@ -40,5 +40,5 @@ data:
   num_threads: 2
   max_length: 512
   tokenizer_parallelism: false
-  random_span: false
+  random_span: true
   prefetch_factor: 2
