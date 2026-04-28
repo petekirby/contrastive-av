@@ -34,6 +34,7 @@ class PANDataModule(L.LightningDataModule):
         self.short_chance = short_chance
         self.collate_fn = None
         self.pair_collate_fn = None
+        self.test_collate_fn = None
         if self.tokenizer_parallelism:
             self.num_workers = 1
             os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -58,6 +59,7 @@ class PANDataModule(L.LightningDataModule):
             max_chars = self.max_length * 5
             self.collate_fn = BaselineCollator(prefix=self.text_prefix, random_span=self.random_span, negatives_per_positive=model.hparams.negatives_per_positive, max_chars=max_chars)
             self.pair_collate_fn = BaselinePairCollator(prefix=self.text_prefix, max_chars=max_chars)
+            self.test_collate_fn = self.pair_collate_fn
             return
 
         tokenizer_name = self.tokenizer_name or model.hparams.model_config["model_name_or_path"]
@@ -65,9 +67,11 @@ class PANDataModule(L.LightningDataModule):
         if isinstance(model, TransformerContrastiveModule):
             self.collate_fn = ContrastiveCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left, random_span=self.random_span, short_length=self.short_length, short_chance=self.short_chance)
             self.pair_collate_fn = ContrastivePairCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left)
+            self.test_collate_fn = self.pair_collate_fn
         elif isinstance(model, TransformerClassificationModule):
             self.collate_fn = ClassificationCollator(tokenizer_name, self.max_length, prefix = self.text_prefix, negatives_per_positive=model.hparams.negatives_per_positive)
-            self.pair_collate_fn = ClassificationPairCollator(tokenizer_name, self.max_length, prefix = self.text_prefix)
+            self.pair_collate_fn = ClassificationPairCollator(tokenizer_name, self.max_length if self.short_length is None else self.short_length, prefix = self.text_prefix)
+            self.test_collate_fn = ClassificationPairCollator(tokenizer_name, self.max_length, prefix = self.text_prefix)
         else:
             raise ValueError(f"model unrecognized: {type(model).__name__}")
 
@@ -129,7 +133,7 @@ class PANDataModule(L.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             persistent_workers=self.num_workers > 0,
-            collate_fn=self.pair_collate_fn,
+            collate_fn=self.test_collate_fn,
         )
         pan20_test_loader = DataLoader(
             self.pan20_test_pairs,
@@ -137,6 +141,6 @@ class PANDataModule(L.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             persistent_workers=self.num_workers > 0,
-            collate_fn=self.pair_collate_fn,
+            collate_fn=self.test_collate_fn,
         )
         return [pan21_test_loader, pan20_test_loader]
