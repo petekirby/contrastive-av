@@ -14,7 +14,7 @@ trainer:
       save_dir: output
 
 model:
-  class_path: models.transformer_contrastive_module.TransformerContrastiveModule
+  class_path: models.transformer_classification_module.TransformerClassificationModule
   init_args:
     compile: true
     lr: 16e-6
