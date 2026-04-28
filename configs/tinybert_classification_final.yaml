@@ -1,4 +1,4 @@
-seed_everything: 1000                                                 
+seed_everything: 1000
 
 trainer:
   max_epochs: 10
@@ -17,16 +17,13 @@ model:
   class_path: models.transformer_classification_module.TransformerClassificationModule
   init_args:
     compile: true
-    lr: 16e-5 # was 8e-5
-    weight_decay: 5e-6
-    beta2: 0.98
-    eps: 1e-6
+    lr: 4e-5
     lr_schedule: linear
     warmup_ratio: 0.1
     negatives_per_positive: 4
     gamma: 1
     model_config:
-      model_name_or_path: answerdotai/ModernBERT-base
+      model_name_or_path: huawei-noah/TinyBERT_General_4L_312D
       use_bf16: true
       attn_implementation: flash_attention_2
 
@@ -35,7 +32,7 @@ data:
   eval_batch_size: 128
   sampler: mperclass
   m: 2
-  num_threads: 24
+  num_threads: 12
   max_length: 512
   tokenizer_parallelism: false
   prefetch_factor: 1

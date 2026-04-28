@@ -17,19 +17,24 @@ model:
   class_path: models.transformer_classification_module.TransformerClassificationModule
   init_args:                                                                                                                               
     compile: false                          
-    lr: 2e-5                                                                                                                               
+    lr: 16e-5
     head_lr_multiplier: 5.0
     weight_decay: 0.01                                                                                                                     
     lr_schedule: linear                     
     warmup_ratio: 0.1                                                                                                                      
-    freeze_encoder: false                   
+    freeze_encoder: false    
+    negatives_per_positive: 4
+    gamma: 1               
     model_config:                                                                                                                          
       model_name_or_path: distilbert/distilbert-base-uncased
+      use_bf16: true
       attn_implementation: flash_attention_2                                                                                                   
                                             
 data:                                                                                                                                      
-  batch_size: 64
+  batch_size: 8
   sampler: mperclass                                                                                                                       
   m: 2              
-  num_threads: 4                                                                                                                           
-  max_length: 512   
+  num_threads: 24                                                                                                                           
+  max_length: 512
+  tokenizer_parallelism: false
+  prefetch_factor: 1

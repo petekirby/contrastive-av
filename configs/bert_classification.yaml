@@ -1,9 +1,9 @@
-seed_everything: 1000                                                                                                                        
-  
-trainer:                                                                                                                                   
-  max_epochs: 3 
-  accelerator: auto                                                                                                                        
-  devices: 1    
+seed_everything: 1000
+
+trainer:
+  max_epochs: 10
+  accelerator: auto
+  devices: 1
   precision: bf16-mixed
   logger:
     class_path: lightning.pytorch.loggers.WandbLogger
@@ -14,24 +14,26 @@ trainer:
       save_dir: output
 
 model:
-  class_path: models.transformer_classification_module.TransformerClassificationModule                                                     
+  class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
-    compile: false                                                                                                                         
-    lr: 2e-5    
-    head_lr_multiplier: 5.0
-    weight_decay: 0.01                      
-    lr_schedule: linear                 
+    compile: true
+    lr: 16e-5
+    lr_schedule: linear
     warmup_ratio: 0.1
-    freeze_encoder: false                                                                                                                  
+    freeze_encoder: false
+    negatives_per_positive: 4
+    gamma: 1
     model_config:
-      model_name_or_path: google-bert/bert-base-uncased                                                                                    
-      pooling: cls                          
-      head_type: none                   
-      normalize: false
-                                                                                                                                            
+      model_name_or_path: google-bert/bert-base-cased
+      use_bf16: true
+      attn_implementation: flash_attention_2 
+
 data:
-  batch_size: 64                                                                                                                           
+  batch_size: 8
+  eval_batch_size: 64
   sampler: mperclass
   m: 2
-  num_threads: 4
-  max_length: 512                                                                                                                   
+  num_threads: 24
+  max_length: 512
+  tokenizer_parallelism: false
+  prefetch_factor: 1
