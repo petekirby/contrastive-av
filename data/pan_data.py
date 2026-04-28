@@ -66,12 +66,12 @@ class PANDataModule(L.LightningDataModule):
         self.max_length = min(self.max_length, model.model.config.max_position_embeddings)
         if isinstance(model, TransformerContrastiveModule):
             self.collate_fn = ContrastiveCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left, random_span=self.random_span, short_length=self.short_length, short_chance=self.short_chance)
-            self.pair_collate_fn = ContrastivePairCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left)
-            self.test_collate_fn = self.pair_collate_fn
-        elif isinstance(model, TransformerClassificationModule):
-            self.collate_fn = ClassificationCollator(tokenizer_name, self.max_length, prefix = self.text_prefix, negatives_per_positive=model.hparams.negatives_per_positive)
             self.pair_collate_fn = ClassificationPairCollator(tokenizer_name, self.max_length if self.short_length is None else self.short_length, prefix = self.text_prefix)
             self.test_collate_fn = ClassificationPairCollator(tokenizer_name, self.max_length, prefix = self.text_prefix)
+        elif isinstance(model, TransformerClassificationModule):
+            self.collate_fn = ClassificationCollator(tokenizer_name, self.max_length, prefix = self.text_prefix, negatives_per_positive=model.hparams.negatives_per_positive)
+            self.pair_collate_fn = ContrastivePairCollator(tokenizer_name, self.max_length, prefix=self.text_prefix, padding_left=self.padding_left)
+            self.test_collate_fn = self.pair_collate_fn
         else:
             raise ValueError(f"model unrecognized: {type(model).__name__}")
 
