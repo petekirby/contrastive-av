@@ -22,9 +22,10 @@ model:
     weight_decay: 0.01                                                                                                                     
     lr_schedule: linear                     
     warmup_ratio: 0.1                                                                                                                      
-    freeze_encoder: false    
-    negatives_per_positive: 4
-    gamma: 1               
+    freeze_encoder: false
+    negatives_per_positive: 1
+    alpha: 0.5
+    gamma: 0
     model_config:                                                                                                                          
       model_name_or_path: distilbert/distilbert-base-uncased
       use_bf16: true

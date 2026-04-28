@@ -23,8 +23,9 @@ model:
     eps: 1e-6
     lr_schedule: linear
     warmup_ratio: 0.1
-    negatives_per_positive: 4
-    gamma: 1
+    negatives_per_positive: 1
+    alpha: 0.5
+    gamma: 0
     model_config:
       model_name_or_path: answerdotai/ModernBERT-base
       use_bf16: true
