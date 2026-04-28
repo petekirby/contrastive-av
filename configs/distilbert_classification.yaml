@@ -16,8 +16,8 @@ trainer:
 model:                                  
   class_path: models.transformer_classification_module.TransformerClassificationModule
   init_args:                                                                                                                               
-    compile: false                          
-    lr: 16e-5
+    compile: false
+    lr: 16e-6
     head_lr_multiplier: 5.0
     weight_decay: 0.01                                                                                                                     
     lr_schedule: linear                     

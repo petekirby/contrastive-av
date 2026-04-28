@@ -17,7 +17,7 @@ model:
   class_path: models.transformer_classification_module.TransformerClassificationModule
   init_args:
     compile: true
-    lr: 16e-5 # was 8e-5
+    lr: 16e-6
     weight_decay: 5e-6
     beta2: 0.98
     eps: 1e-6

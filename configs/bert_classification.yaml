@@ -17,7 +17,7 @@ model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
     compile: true
-    lr: 16e-5
+    lr: 16e-6
     lr_schedule: linear
     warmup_ratio: 0.1
     freeze_encoder: false
