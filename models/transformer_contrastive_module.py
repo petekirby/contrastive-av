@@ -136,14 +136,25 @@ class TransformerContrastiveModule(pl.LightningModule):
             self._train_metric_scores.append(scores)
             self._train_metric_targets.append(targets)
 
+    def _gather_flat(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.to(self.device)
+        if self.trainer.world_size == 1:
+            return x.detach().cpu()
+        gathered = self.all_gather(x)
+        return gathered.reshape(-1).detach().cpu()
+
     def on_validation_epoch_end(self):
-        threshold, acc, f1 = contrastive_metrics(self._val_scores, self._val_targets, threshold=None)
+        val_scores = self._gather_flat(torch.cat(self._val_scores))
+        val_targets = self._gather_flat(torch.cat(self._val_targets))
+        threshold, acc, f1 = contrastive_metrics([val_scores], [val_targets], threshold=None)
         self.eval_threshold.fill_(float(threshold))
-        self.log("val_acc", acc, prog_bar=True, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
-        self.log("val_f1", f1, prog_bar=True, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
-        _, train_acc, train_f1 = contrastive_metrics(self._train_metric_scores, self._train_metric_targets, threshold=threshold)
-        self.log("train_acc", train_acc, prog_bar=False, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
-        self.log("train_f1", train_f1, prog_bar=False, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
+        self.log("val_acc", acc, prog_bar=True, on_epoch=True, add_dataloader_idx=False)
+        self.log("val_f1", f1, prog_bar=True, on_epoch=True, add_dataloader_idx=False)
+        train_scores = self._gather_flat(torch.cat(self._train_metric_scores))
+        train_targets = self._gather_flat(torch.cat(self._train_metric_targets))
+        _, train_acc, train_f1 = contrastive_metrics([train_scores], [train_targets], threshold=threshold)
+        self.log("train_acc", train_acc, prog_bar=False, on_epoch=True, add_dataloader_idx=False)
+        self.log("train_f1", train_f1, prog_bar=False, on_epoch=True, add_dataloader_idx=False)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         if torch.isnan(self.eval_threshold):
