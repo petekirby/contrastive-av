@@ -38,4 +38,5 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
     torch._dynamo.config.capture_scalar_outputs = True
     torch._dynamo.config.allow_unspec_int_on_nn_module = True
+    torch.autograd.graph.set_warn_on_accumulate_grad_stream_mismatch(False)
     main()
