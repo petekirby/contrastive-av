@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.distributed as dist
 from torch.utils.checkpoint import get_device_states, set_device_states
 
 class Residual(nn.Module):
@@ -30,6 +31,34 @@ class RandContext:
         self._fork.__exit__(exc_type, exc_val, exc_tb)
         self._fork = None
 
+def is_using_ddp():
+    return dist.is_available() and dist.is_initialized()
+
+def ddp_loss_averaging_correction_factor():
+    return dist.get_world_size() if is_using_ddp() else 1
+
+def gather_with_local_grad(x):
+    if not is_using_ddp():
+        return x
+
+    world_size = dist.get_world_size()
+    rank = dist.get_rank()
+    gathered = [torch.zeros_like(x) for _ in range(world_size)]
+
+    # if from another gpu, detach from graph
+    dist.all_gather(gathered, x.detach())
+    # use autograd for this gpu
+    gathered[rank] = x
+    return torch.cat(gathered, dim=0)
+
+def gather_without_local_grad(x):
+    if not is_using_ddp():
+        return x
+
+    world_size = dist.get_world_size()
+    gathered = [torch.zeros_like(x) for _ in range(world_size)]
+    dist.all_gather(gathered, x.contiguous())
+    return torch.cat(gathered, dim=0)
 
 # Large logical batches are good for metric learning because the objective is to move embeddings towards a high number of distinct points.
 # We don't use gradient accumulation because microbatches must be able to look forward to 'future' embeddings to compute loss.
@@ -62,15 +91,17 @@ class ChunkedTrainStep(nn.Module):
         # Detach, then use for backprop: https://docs.pytorch.org/docs/stable/generated/torch.Tensor.requires_grad_.html
         embeddings = torch.cat(embeddings_list, dim=0).detach().requires_grad_()
         del embeddings_list
-        indices_tuple = self.miner(embeddings, target) if self.miner is not None else None
+        embeddings_global = gather_with_local_grad(embeddings)
+        target_global = gather_without_local_grad(target)
+        indices_tuple = self.miner(embeddings_global, target_global) if self.miner is not None else None
         # Because of requires_grad_() above, PyTorch keeps track of operations in loss_fn that use embeddings.
-        loss = self.loss_fn(embeddings, target, indices_tuple)
+        loss = self.loss_fn(embeddings_global, target_global, indices_tuple)
         # This allows PyTorch to compute the gradient of the loss (L) with respect to the embeddings (Z).
         # Docs: https://docs.pytorch.org/docs/stable/generated/torch.autograd.grad.html
         # Intuition: https://medium.com/@rizqinur2010/partial-derivatives-chain-rule-using-torch-autograd-grad-a8b5917373fa
         grad_cache = torch.autograd.grad(loss, embeddings, retain_graph=False, create_graph=False)[0].detach() # grad returns a 1-tuple (dL/dZ,)
         loss_out = loss.detach()
-        del loss, embeddings, indices_tuple
+        del loss, embeddings, embeddings_global, target_global, indices_tuple
 
         opt = pl_module.optimizers()
         scheduler = pl_module.lr_schedulers()
@@ -84,6 +115,7 @@ class ChunkedTrainStep(nn.Module):
                 with state:
                     z = pl_module(**x)
                     per_chunk_backprop_loss = torch.dot(z.flatten(), g.flatten())
+                    per_chunk_backprop_loss *= ddp_loss_averaging_correction_factor()
                     pl_module.manual_backward(per_chunk_backprop_loss)
 
         opt.step()
