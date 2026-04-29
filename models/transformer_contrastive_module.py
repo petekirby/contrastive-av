@@ -92,7 +92,7 @@ class TransformerContrastiveModule(pl.LightningModule):
         else:
             embeddings = self(**inputs)
             loss = self.loss(embeddings, target)
-        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, batch_size=target.shape[0])
+        self.log("train_loss", loss, prog_bar=True, on_step=False, on_epoch=True, batch_size=target.shape[0], sync_dist=True)
         return loss
 
     def configure_optimizers(self):
@@ -139,11 +139,11 @@ class TransformerContrastiveModule(pl.LightningModule):
     def on_validation_epoch_end(self):
         threshold, acc, f1 = contrastive_metrics(self._val_scores, self._val_targets, threshold=None)
         self.eval_threshold.fill_(float(threshold))
-        self.log("val_acc", acc, prog_bar=True, on_epoch=True, add_dataloader_idx=False)
-        self.log("val_f1", f1, prog_bar=True, on_epoch=True, add_dataloader_idx=False)
+        self.log("val_acc", acc, prog_bar=True, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
+        self.log("val_f1", f1, prog_bar=True, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
         _, train_acc, train_f1 = contrastive_metrics(self._train_metric_scores, self._train_metric_targets, threshold=threshold)
-        self.log("train_acc", train_acc, prog_bar=False, on_epoch=True, add_dataloader_idx=False)
-        self.log("train_f1", train_f1, prog_bar=False, on_epoch=True, add_dataloader_idx=False)
+        self.log("train_acc", train_acc, prog_bar=False, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
+        self.log("train_f1", train_f1, prog_bar=False, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         if torch.isnan(self.eval_threshold):
@@ -155,12 +155,12 @@ class TransformerContrastiveModule(pl.LightningModule):
         if dataloader_idx == 0:
             self.test_acc.update(preds, targets)
             self.test_f1.update(preds, targets)
-            self.log("test_acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True, add_dataloader_idx=False)
-            self.log("test_f1", self.test_f1, on_step=False, on_epoch=True, prog_bar=True, add_dataloader_idx=False)
+            self.log("test_acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True, add_dataloader_idx=False, sync_dist=True)
+            self.log("test_f1", self.test_f1, on_step=False, on_epoch=True, prog_bar=True, add_dataloader_idx=False, sync_dist=True)
         elif dataloader_idx == 1:
             self.pan20_test_acc.update(preds, targets)
             self.pan20_test_f1.update(preds, targets)
-            self.log("pan20_test_acc", self.pan20_test_acc, on_step=False, on_epoch=True, prog_bar=False, add_dataloader_idx=False)
-            self.log("pan20_test_f1", self.pan20_test_f1, on_step=False, on_epoch=True, prog_bar=False, add_dataloader_idx=False)
+            self.log("pan20_test_acc", self.pan20_test_acc, on_step=False, on_epoch=True, prog_bar=False, add_dataloader_idx=False, sync_dist=True)
+            self.log("pan20_test_f1", self.pan20_test_f1, on_step=False, on_epoch=True, prog_bar=False, add_dataloader_idx=False, sync_dist=True)
         else:
             raise ValueError(f"unexpected dataloader_idx: {dataloader_idx}")

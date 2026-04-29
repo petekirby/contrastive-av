@@ -57,7 +57,7 @@ class ChunkedTrainStep(nn.Module):
             x = {k: v[i:i + m] for k, v in inputs.items()}
             states.append(RandContext(*x.values()))
             with torch.inference_mode():
-                embeddings_list.append(pl_module(**x))
+                embeddings_list.append(pl_module(**x).detach())
 
         # Detach, then use for backprop: https://docs.pytorch.org/docs/stable/generated/torch.Tensor.requires_grad_.html
         embeddings = torch.cat(embeddings_list, dim=0).detach().requires_grad_()
@@ -68,7 +68,7 @@ class ChunkedTrainStep(nn.Module):
         # This allows PyTorch to compute the gradient of the loss (L) with respect to the embeddings (Z).
         # Docs: https://docs.pytorch.org/docs/stable/generated/torch.autograd.grad.html
         # Intuition: https://medium.com/@rizqinur2010/partial-derivatives-chain-rule-using-torch-autograd-grad-a8b5917373fa
-        grad_cache = torch.autograd.grad(loss, embeddings)[0] # grad returns a 1-tuple (dL/dZ,)
+        grad_cache = torch.autograd.grad(loss, embeddings, retain_graph=False, create_graph=False)[0].detach() # grad returns a 1-tuple (dL/dZ,)
         loss_out = loss.detach()
         del loss, embeddings, indices_tuple
 
@@ -76,12 +76,15 @@ class ChunkedTrainStep(nn.Module):
         scheduler = pl_module.lr_schedulers()
         opt.zero_grad(set_to_none=True)
 
-        for i, state, g in zip(range(0, n, m), states, grad_cache.split(self.microbatch_size)):
+        chunks = list(zip(range(0, n, m), states, grad_cache.split(m)))
+        for chunk_idx, (i, state, g) in enumerate(chunks):
             x = {k: v[i:i + m] for k, v in inputs.items()}
-            with state:
-                z = pl_module(**x)
-                per_chunk_backprop_loss = torch.dot(z.flatten(), g.flatten())
-                pl_module.manual_backward(per_chunk_backprop_loss)
+            sync_grad = chunk_idx == len(chunks) - 1 # only sync on the last one
+            with opt.toggle_model(sync_grad=sync_grad):
+                with state:
+                    z = pl_module(**x)
+                    per_chunk_backprop_loss = torch.dot(z.flatten(), g.flatten())
+                    pl_module.manual_backward(per_chunk_backprop_loss)
 
         opt.step()
         scheduler.step()
