@@ -45,6 +45,6 @@ data:
   sampler: mperclass
   m: 2
   num_threads: 32
-  max_length: 512
+  max_length: 1024
   tokenizer_parallelism: false
   prefetch_factor: 2
