@@ -44,7 +44,7 @@ data:
   eval_batch_size: 8
   sampler: mperclass
   m: 2
-  num_threads: 64
+  num_threads: 16
   max_length: 2048
   tokenizer_parallelism: false
   prefetch_factor: 2
