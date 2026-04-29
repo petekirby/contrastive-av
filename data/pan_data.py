@@ -5,7 +5,7 @@ import os
 import lightning as L
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-from pytorch_metric_learning.samplers import MPerClassSampler
+from .distributed_sampler import distributed_mperclass_sampler
 from .contrastive_collate import ContrastiveCollator, ContrastivePairCollator
 from models.transformer_contrastive_module import TransformerContrastiveModule
 from models.transformer_classification_module import TransformerClassificationModule                                                       
@@ -77,21 +77,18 @@ class PANDataModule(L.LightningDataModule):
 
     def train_dataloader(self):
         if self.sampler == "mperclass":
-            sampler = MPerClassSampler(
+            sampler = distributed_mperclass_sampler(
                 labels=self.train_data["author_int"],
                 m=self.m,
                 batch_size=self.batch_size,
-                length_before_new_iter=len(self.train_data),
             )
             return DataLoader(
                 self.train_data,
-                batch_size=self.batch_size,
-                sampler=sampler,
+                batch_sampler=sampler,
                 num_workers=self.num_workers,
                 prefetch_factor=self.prefetch_factor,
                 persistent_workers=self.num_workers > 0,
                 pin_memory=True,
-                drop_last=True,
                 collate_fn=self.collate_fn,
             )
 

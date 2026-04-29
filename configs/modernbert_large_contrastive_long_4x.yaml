@@ -5,6 +5,7 @@ trainer:
   accelerator: auto
   devices: 4
   strategy: ddp
+  use_distributed_sampler: false
   precision: bf16-mixed
   logger:
     class_path: lightning.pytorch.loggers.WandbLogger
