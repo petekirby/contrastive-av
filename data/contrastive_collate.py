@@ -36,7 +36,7 @@ class ContrastiveCollator:
 
     def __call__(self, batch):
         max_length = self.max_length
-        if self.short_length is not None and torch.rand(()) < self.short_chance:
+        if self.short_length is not None and torch.rand(()) <= self.short_chance:
             max_length = min(self.short_length, self.max_length)
 
         texts = [random_span_text(x["text"], prefix=self.prefix, random=self.random_span) for x in batch]
