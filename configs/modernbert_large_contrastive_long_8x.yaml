@@ -41,10 +41,10 @@ model:
 
 data:
   batch_size: 256 # 256 * 8 = 2048
-  eval_batch_size: 16
+  eval_batch_size: 8
   sampler: mperclass
   m: 2
-  num_threads: 32
+  num_threads: 64
   max_length: 2048
   tokenizer_parallelism: false
   prefetch_factor: 2
