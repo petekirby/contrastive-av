@@ -1,5 +1,5 @@
 import torch.distributed as dist
-from torch.utils.data import BatchSampler
+from torch.utils.data import Sampler, BatchSampler
 from accelerate.data_loader import BatchSamplerShard
 from pytorch_metric_learning.samplers import MPerClassSampler
 
@@ -17,3 +17,8 @@ def distributed_mperclass_sampler(labels, m, batch_size):
     # Docs: https://huggingface.co/docs/accelerate/package_reference/torch_wrappers#accelerate.data_loader.BatchSamplerShard
     # This makes sure each gpu sees a contiguous slice of the global batch
     return BatchSamplerShard(batches_global, num_processes=world, process_index=rank, split_batches=True, even_batches=False)
+
+def distributed_eval_sampler(dataset):
+    world = dist.get_world_size() if dist.is_initialized() else 1
+    rank = dist.get_rank() if dist.is_initialized() else 0
+    return range(rank, len(dataset), world)

@@ -10,10 +10,9 @@ from .torch_utils import ChunkedTrainStep
 from .loss_defaults import build_loss_fn
 from .optimizer_utils import build_param_groups
 from .transformer_embedding_model import TransformerEmbeddingModel
-from helper_functions.contrastive_eval import pair_scores_and_targets, contrastive_metrics
+from helper_functions.contrastive_eval import pair_scores_and_targets, ContrastiveEvalMetric
 from torchmetrics.classification import BinaryAccuracy, BinaryF1Score
 from pytorch_metric_learning import losses
-from .torch_utils import gather_without_local_grad
 
 
 # Docs: https://lightning.ai/docs/pytorch/stable/common/lightning_module.html
@@ -51,6 +50,8 @@ class TransformerContrastiveModule(pl.LightningModule):
             self.loss_fn = losses.CrossBatchMemory(self.loss_fn, self.model.embedding_dim, memory_size=self.cross_batch_memory_size, miner=self.miner)
             self.miner = None
         self.register_buffer("eval_threshold", torch.tensor(float("nan")))
+        self.val_metric = ContrastiveEvalMetric()
+        self.train_metric = ContrastiveEvalMetric()
         self.test_acc = BinaryAccuracy()
         self.test_f1 = BinaryF1Score()
         self.pan20_test_acc = BinaryAccuracy()
@@ -86,26 +87,8 @@ class TransformerContrastiveModule(pl.LightningModule):
         else:
             return self.loss_fn(embeddings, target)
 
-    def _debug_global_targets(self, target, batch_idx):
-        if batch_idx >= 3:
-            return
-
-        target_global = gather_without_local_grad(target)
-
-        if self.global_rank == 0:
-            unique, counts = torch.unique(target_global.cpu(), return_counts=True)
-
-            print("GLOBAL TARGET DEBUG")
-            print("global_n:", target_global.numel())
-            print("unique_authors:", unique.numel())
-            print("min_count:", counts.min().item())
-            print("max_count:", counts.max().item())
-            print("num_singletons:", (counts == 1).sum().item())
-            print("count_hist:", torch.bincount(counts).tolist())
-
     def training_step(self, batch, batch_idx):
         inputs, target = batch
-        self._debug_global_targets(target, batch_idx)
         if self.microbatch_size is not None:
             loss = self.chunked_train_step(self, inputs, target)
         else:
@@ -141,37 +124,22 @@ class TransformerContrastiveModule(pl.LightningModule):
         }
 
     def on_validation_epoch_start(self):
-        self._val_scores = []
-        self._val_targets = []
-        self._train_metric_scores = []
-        self._train_metric_targets = []
+        self.val_metric.reset()
+        self.train_metric.reset()
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         scores, targets = pair_scores_and_targets(self, batch)
         if dataloader_idx == 0:
-            self._val_scores.append(scores)
-            self._val_targets.append(targets)
+            self.val_metric.update(scores.to(self.device), targets.to(self.device))
         elif dataloader_idx == 1:
-            self._train_metric_scores.append(scores)
-            self._train_metric_targets.append(targets)
-
-    def _gather_flat(self, x: torch.Tensor) -> torch.Tensor:
-        x = x.to(self.device)
-        if self.trainer.world_size == 1:
-            return x.detach().cpu()
-        gathered = self.all_gather(x)
-        return gathered.reshape(-1).detach().cpu()
+            self.train_metric.update(scores.to(self.device), targets.to(self.device))
 
     def on_validation_epoch_end(self):
-        val_scores = self._gather_flat(torch.cat(self._val_scores))
-        val_targets = self._gather_flat(torch.cat(self._val_targets))
-        threshold, acc, f1 = contrastive_metrics([val_scores], [val_targets], threshold=None)
+        threshold, acc, f1 = self.val_metric.compute(threshold=None)
         self.eval_threshold.fill_(float(threshold))
         self.log("val_acc", acc, prog_bar=True, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
         self.log("val_f1", f1, prog_bar=True, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
-        train_scores = self._gather_flat(torch.cat(self._train_metric_scores))
-        train_targets = self._gather_flat(torch.cat(self._train_metric_targets))
-        _, train_acc, train_f1 = contrastive_metrics([train_scores], [train_targets], threshold=threshold)
+        _, train_acc, train_f1 = self.train_metric.compute(threshold=threshold)
         self.log("train_acc", train_acc, prog_bar=False, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
         self.log("train_f1", train_f1, prog_bar=False, on_epoch=True, add_dataloader_idx=False, sync_dist=True)
 

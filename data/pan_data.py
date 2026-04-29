@@ -5,7 +5,7 @@ import os
 import lightning as L
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-from .distributed_sampler import distributed_mperclass_sampler
+from .distributed_sampler import distributed_mperclass_sampler, distributed_eval_sampler
 from .contrastive_collate import ContrastiveCollator, ContrastivePairCollator
 from models.transformer_contrastive_module import TransformerContrastiveModule
 from models.transformer_classification_module import TransformerClassificationModule                                                       
@@ -108,6 +108,7 @@ class PANDataModule(L.LightningDataModule):
         val_loader = DataLoader(
             self.val_pairs,
             batch_size=self.eval_batch_size,
+            sampler=distributed_eval_sampler(self.val_pairs),
             shuffle=False,
             num_workers=self.num_workers,
             persistent_workers=self.num_workers > 0,
@@ -116,6 +117,7 @@ class PANDataModule(L.LightningDataModule):
         train_metric_loader = DataLoader(
             self.train_metric_pairs,
             batch_size=self.eval_batch_size,
+            sampler=distributed_eval_sampler(self.train_metric_pairs),
             shuffle=False,
             num_workers=self.num_workers,
             persistent_workers=self.num_workers > 0,
@@ -127,6 +129,7 @@ class PANDataModule(L.LightningDataModule):
         pan21_test_loader = DataLoader(
             self.test_pairs,
             batch_size=self.eval_batch_size,
+            sampler=distributed_eval_sampler(self.test_pairs),
             shuffle=False,
             num_workers=self.num_workers,
             persistent_workers=self.num_workers > 0,
@@ -135,6 +138,7 @@ class PANDataModule(L.LightningDataModule):
         pan20_test_loader = DataLoader(
             self.pan20_test_pairs,
             batch_size=self.eval_batch_size,
+            sampler=distributed_eval_sampler(self.pan20_test_pairs),
             shuffle=False,
             num_workers=self.num_workers,
             persistent_workers=self.num_workers > 0,

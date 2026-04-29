@@ -4,6 +4,8 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, precision_recall_curve
+from torchmetrics import Metric
+from torchmetrics.utilities import dim_zero_cat
 
 
 def pair_scores_and_targets(model, batch):
@@ -36,3 +38,20 @@ def contrastive_metrics(score_list, target_list, threshold=None):
     acc = accuracy_score(y_true, preds)
     f1 = f1_score(y_true, preds)
     return float(threshold), acc, f1
+
+
+# Source: https://lightning.ai/docs/torchmetrics/stable/pages/implement.html
+class ContrastiveEvalMetric(Metric):
+    def __init__(self):
+        super().__init__()
+        self.add_state("scores", default=[], dist_reduce_fx="cat")
+        self.add_state("targets", default=[], dist_reduce_fx="cat")
+
+    def update(self, scores: torch.Tensor, targets: torch.Tensor):
+        self.scores.append(scores.detach().flatten())
+        self.targets.append(targets.detach().flatten())
+
+    def compute(self, threshold=None):
+        scores = dim_zero_cat(self.scores)
+        targets = dim_zero_cat(self.targets)
+        return contrastive_metrics([scores], [targets], threshold=threshold)
