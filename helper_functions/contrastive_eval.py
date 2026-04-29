@@ -28,8 +28,8 @@ def calibrate_threshold(y_true, scores):
 
 
 def contrastive_metrics(score_list, target_list, threshold=None):
-    scores = torch.cat(score_list).numpy()
-    y_true = torch.cat(target_list).numpy()
+    scores = torch.cat(score_list).detach().cpu().numpy()
+    y_true = torch.cat(target_list).detach().cpu().numpy()
 
     if threshold is None:
         threshold = calibrate_threshold(y_true, scores)
