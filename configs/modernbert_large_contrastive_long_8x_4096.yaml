@@ -19,7 +19,7 @@ model:
   class_path: models.transformer_contrastive_module.TransformerContrastiveModule
   init_args:
     compile: true
-    lr: 12e-5 # was 8e-5
+    lr: 8e-5
     weight_decay: 1e-5
     beta2: 0.98
     eps: 1e-6
@@ -40,7 +40,7 @@ model:
         temperature: 0.01
 
 data:
-  batch_size: 256 # 256 * 8 = 2048
+  batch_size: 512 # 256 * 8 = 4096
   eval_batch_size: 4
   sampler: mperclass
   m: 2
