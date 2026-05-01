@@ -15,8 +15,6 @@ class TrainCLI(LightningCLI):
         else:
             ckpt_path = "best"
         self.trainer.test(model=self.model, datamodule=self.datamodule, ckpt_path=ckpt_path)
-        for ext in ("yaml", "csv"):
-            wandb.save(f"{self.trainer.log_dir}/*.{ext}", policy="now")
 
 
 def main():
