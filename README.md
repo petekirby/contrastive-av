@@ -1,26 +1,18 @@
 # Paper
 
-![Paper page 1 of 11](paper/page-01.png)
-
-![Paper page 2 of 11](paper/page-02.png)
-
-![Paper page 3 of 11](paper/page-03.png)
-
-![Paper page 4 of 11](paper/page-04.png)
-
-![Paper page 5 of 11](paper/page-05.png)
-
-![Paper page 6 of 11](paper/page-06.png)
-
-![Paper page 7 of 11](paper/page-07.png)
-
-![Paper page 8 of 11](paper/page-08.png)
-
-![Paper page 9 of 11](paper/page-09.png)
-
-![Paper page 10 of 11](paper/page-10.png)
-
-![Paper page 11 of 11](paper/page-11.png)
+<p>
+<img src="paper/page-01.png" alt="Paper page 1 of 11"><br>
+<img src="paper/page-02.png" alt="Paper page 2 of 11"><br>
+<img src="paper/page-03.png" alt="Paper page 3 of 11"><br>
+<img src="paper/page-04.png" alt="Paper page 4 of 11"><br>
+<img src="paper/page-05.png" alt="Paper page 5 of 11"><br>
+<img src="paper/page-06.png" alt="Paper page 6 of 11"><br>
+<img src="paper/page-07.png" alt="Paper page 7 of 11"><br>
+<img src="paper/page-08.png" alt="Paper page 8 of 11"><br>
+<img src="paper/page-09.png" alt="Paper page 9 of 11"><br>
+<img src="paper/page-10.png" alt="Paper page 10 of 11"><br>
+<img src="paper/page-11.png" alt="Paper page 11 of 11">
+</p>
 
 # Data
 
